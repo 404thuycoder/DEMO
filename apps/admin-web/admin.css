@@ -1603,6 +1603,50 @@ body.admin-body::before {
   outline: none;
   font-family: inherit;
   font-size: inherit;
+  cursor: text;
+}
+
+.command-input::placeholder {
+  color: rgba(148, 163, 184, 0.3) !important;
+}
+
+select.command-input {
+  cursor: pointer;
+  padding-right: 20px;
+}
+
+select.command-input option {
+  background-color: #0f172a;
+  color: #f8fafc;
+}
+
+.command-line span:not(.command-prompt) {
+  color: #64748b;
+}
+
+.command-input:focus {
+  color: #38bdf8;
+}
+
+.command-input-wrap {
+  position: relative;
+  flex: 1;
+}
+
+.command-input-wrap::after {
+  content: "";
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  width: 0;
+  height: 1px;
+  background: #38bdf8;
+  transition: width 0.3s;
+}
+
+.command-input-wrap:focus-within::after {
+  width: 100%;
+  box-shadow: 0 0 8px #38bdf8;
 }
 
 .command-btn {

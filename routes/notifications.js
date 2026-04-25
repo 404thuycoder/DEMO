@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const Notification = require('../models/Notification');
-const { auth } = require('./auth');
+const { auth, sharedAuth } = require('./auth');
 const User = require('../models/User');
 
 // --- Helper for role-restricted middleware ---
@@ -13,7 +13,7 @@ const roleAuth = (roles) => (req, res, next) => {
 };
 
 // GET /api/notifications - Get current user notifications
-router.get('/', auth, async (req, res) => {
+router.get('/', sharedAuth, async (req, res) => {
   try {
     const notifications = await Notification.find({
       $or: [
@@ -32,7 +32,7 @@ router.get('/', auth, async (req, res) => {
 });
 
 // GET /api/notifications/unread-count
-router.get('/unread-count', auth, async (req, res) => {
+router.get('/unread-count', sharedAuth, async (req, res) => {
   try {
     const count = await Notification.countDocuments({
       $or: [
@@ -49,7 +49,7 @@ router.get('/unread-count', auth, async (req, res) => {
 });
 
 // PUT /api/notifications/read/:id - Mark as read
-router.put('/read/:id', auth, async (req, res) => {
+router.put('/read/:id', sharedAuth, async (req, res) => {
   try {
     const notification = await Notification.findById(req.params.id);
     if (!notification) return res.status(404).json({ success: false, message: 'Không tìm thấy' });
@@ -71,7 +71,7 @@ router.put('/read/:id', auth, async (req, res) => {
 });
 
 // POST /api/notifications/broadcast - Admin send broadcast
-router.post('/broadcast', auth, roleAuth(['admin', 'superadmin']), async (req, res) => {
+router.post('/broadcast', sharedAuth, roleAuth(['admin', 'superadmin']), async (req, res) => {
   try {
     const { recipientType, title, message, link, type } = req.body;
     

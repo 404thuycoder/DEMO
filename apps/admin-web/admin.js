@@ -16,25 +16,61 @@
         }
       }
     },
-    loadNotifications() {
+    async loadNotifications() {
       const list = document.getElementById('notif-list');
       if (!list) return;
-      // Get data safely
-      const data = typeof logsData !== 'undefined' ? logsData : [];
-      const recentLogs = data.slice(0, 10);
-      if (recentLogs.length === 0) {
-        list.innerHTML = '<div class="empty-state">Không có thông báo mới</div>';
-        return;
-      }
-      list.innerHTML = recentLogs.map(log => `
-        <div class="log-item-minimal">
-          <div class="log-icon-min">🔔</div>
-          <div class="log-text-min">
-            <strong>${log.user}</strong>: <code>${log.action}</code>
+      try {
+        const json = await apiFetch('/api/notifications');
+        if (!json.success || !json.data || json.data.length === 0) {
+          list.innerHTML = '<div class="empty-state">Không có thông báo mới</div>';
+          return;
+        }
+        list.innerHTML = json.data.map(notif => `
+          <div class="log-item-minimal ${notif.isRead ? '' : 'is-unread'}" 
+               style="cursor:pointer; transition: background 0.2s; padding: 0.75rem; border-radius: 8px; margin-bottom: 0.5rem; ${notif.isRead ? 'opacity: 0.7;' : 'background: rgba(56, 189, 248, 0.05); border-left: 3px solid var(--admin-primary);'}"
+               onclick="WanderUI.markAsRead('${notif._id}', '${notif.link}')">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+              <div class="log-text-min" style="flex:1">
+                <strong style="display:block; margin-bottom: 0.2rem;">${notif.title}</strong>
+                <div style="font-size: 0.85rem; color: var(--admin-text-muted); line-height: 1.4;">${notif.message}</div>
+              </div>
+              <div class="log-icon-min" style="margin-left: 0.5rem;">${notif.type === 'success' ? '✅' : notif.type === 'warning' ? '⚠️' : '🔔'}</div>
+            </div>
+            <div class="log-time-min" style="margin-top: 0.5rem; font-size: 0.75rem; opacity: 0.6;">
+              ${new Date(notif.createdAt).toLocaleString('vi-VN')}
+            </div>
           </div>
-          <div class="log-time-min">${new Date(log.timestamp).toLocaleTimeString()}</div>
-        </div>
-      `).join('');
+        `).join('');
+      } catch (err) {
+        list.innerHTML = '<div class="empty-state" style="color:var(--admin-danger)">Lỗi tải thông báo</div>';
+      }
+    },
+    async markAsRead(id, link) {
+      try {
+        await apiFetch(`/api/notifications/read/${id}`, { method: 'PUT' });
+        this.updateNotificationBadge();
+        if (link && link !== '#' && link !== 'undefined') {
+          window.location.href = link;
+        } else {
+          this.loadNotifications();
+        }
+      } catch (err) {
+        console.error('Mark as read failed:', err);
+      }
+    },
+    async updateNotificationBadge() {
+      try {
+        const json = await apiFetch('/api/notifications/unread-count');
+        const badge = document.querySelector('[data-notif-badge]');
+        if (badge) {
+          if (json.count > 0) {
+            badge.textContent = json.count > 20 ? '20+' : json.count;
+            badge.style.display = 'flex';
+          } else {
+            badge.style.display = 'none';
+          }
+        }
+      } catch (err) { /* silent fail */ }
     },
     exportToCSV(type) {
       let data = [];
@@ -571,6 +607,7 @@
       loadDistributionChart();
       loadRankings();
       loadHealthStatus();
+      WanderUI.updateNotificationBadge();
 
       // Load overview data in background
       const refreshAll = () => {
@@ -620,6 +657,7 @@
       setInterval(refreshAll, 10000);
       // Faster polling for the activity stream ticker
       setInterval(() => pollActivityStream().catch(e => {}), 5000);
+      setInterval(() => WanderUI.updateNotificationBadge().catch(e => {}), 60000);
       
     } catch (e) {
       console.error('Admin bootstrap error:', e);
@@ -640,10 +678,10 @@
       overview: 'Tổng quan hệ thống',
       moderation: 'Duyệt nội dung',
       users: 'Quản lý người dùng',
-      notifications: 'Gửi thông báo',
+      broadcast: 'Gửi thông báo',
       logs: 'Nhật ký hệ thống',
       places: 'Kho địa điểm',
-      admins: 'Quản lý Admin',
+      'admin-management': 'Quản lý Admin',
       feedbacks: 'Phản hồi người dùng',
       itineraries: 'Lịch trình AI'
     };
@@ -727,6 +765,7 @@
       case 'logs':
  await loadLogs('all'); break;
             case 'moderation': await loadModeration(); break;
+            case 'admin-management': await loadUsers(); break;
           }
         }
       });
@@ -2377,8 +2416,9 @@
       const body = {
         title: fd.get('title'),
         message: fd.get('message'),
-        recipientType: fd.get('recipientType'), // Match the select name in terminal UI
-        type: fd.get('type')
+        recipientType: fd.get('recipientType'),
+        type: fd.get('type'),
+        link: fd.get('link')
       };
 
       const btn = document.getElementById('btn-send-broadcast');

@@ -689,9 +689,10 @@
                     <span>select --recipient</span>
                     <div class="command-input-wrap">
                       <select name="recipientType" class="command-input" style="appearance: none;">
-                        <option value="ALL">ALL_USERS</option>
+                        <option value="ALL">ALL_CHANNELS</option>
                         <option value="BUSINESS">BUSINESS_PARTNERS</option>
                         <option value="USER">TRAVELERS</option>
+                        <option value="ADMIN">ADMIN_STAFF</option>
                       </select>
                     </div>
                   </div>
@@ -1180,7 +1181,7 @@
   <div id="drawer-notifications" class="slide-drawer" hidden>
     <div class="slide-drawer__inner">
       <div class="slide-drawer__header">
-        <h3 class="slide-drawer__title">Thông báo hệ thống</h3>
+        <h3 class="slide-drawer__title">🔔 Thông báo hệ thống</h3>
         <button type="button" class="slide-drawer__close" onclick="WanderUI.toggleNotificationDrawer()">&times;</button>
       </div>
       <div class="slide-drawer__body" id="notif-list">

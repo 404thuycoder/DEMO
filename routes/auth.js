@@ -75,6 +75,7 @@ const verifyPortalToken = (expectedPortal) => async (req, res, next) => {
 const auth = verifyPortalToken('user');
 const businessAuth = verifyPortalToken('business');
 const adminTokenAuth = verifyPortalToken('admin');
+const sharedAuth = verifyPortalToken(null);
 
 async function ensureDefaultAdmin() {
   await AdminAccount.deleteMany({ email: 'root@wanderviet.com' });
@@ -497,4 +498,4 @@ router.get('/leaderboard', async (req, res) => {
   }
 });
 
-module.exports = { router, auth, businessAuth, adminTokenAuth, JWT_SECRET };
+module.exports = { router, auth, businessAuth, adminTokenAuth, sharedAuth, JWT_SECRET };
