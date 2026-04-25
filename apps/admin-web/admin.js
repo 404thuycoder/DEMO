@@ -16,61 +16,25 @@
         }
       }
     },
-    async loadNotifications() {
+    loadNotifications() {
       const list = document.getElementById('notif-list');
       if (!list) return;
-      try {
-        const json = await apiFetch('/api/notifications');
-        if (!json.success || !json.data || json.data.length === 0) {
-          list.innerHTML = '<div class="empty-state">Không có thông báo mới</div>';
-          return;
-        }
-        list.innerHTML = json.data.map(notif => `
-          <div class="log-item-minimal ${notif.isRead ? '' : 'is-unread'}" 
-               style="cursor:pointer; transition: background 0.2s; padding: 0.75rem; border-radius: 8px; margin-bottom: 0.5rem; ${notif.isRead ? 'opacity: 0.7;' : 'background: rgba(56, 189, 248, 0.05); border-left: 3px solid var(--admin-primary);'}"
-               onclick="WanderUI.markAsRead('${notif._id}', '${notif.link}')">
-            <div style="display:flex; justify-content:space-between; align-items:flex-start;">
-              <div class="log-text-min" style="flex:1">
-                <strong style="display:block; margin-bottom: 0.2rem;">${notif.title}</strong>
-                <div style="font-size: 0.85rem; color: var(--admin-text-muted); line-height: 1.4;">${notif.message}</div>
-              </div>
-              <div class="log-icon-min" style="margin-left: 0.5rem;">${notif.type === 'success' ? '✅' : notif.type === 'warning' ? '⚠️' : '🔔'}</div>
-            </div>
-            <div class="log-time-min" style="margin-top: 0.5rem; font-size: 0.75rem; opacity: 0.6;">
-              ${new Date(notif.createdAt).toLocaleString('vi-VN')}
-            </div>
+      // Get data safely
+      const data = typeof logsData !== 'undefined' ? logsData : [];
+      const recentLogs = data.slice(0, 10);
+      if (recentLogs.length === 0) {
+        list.innerHTML = '<div class="empty-state">Không có thông báo mới</div>';
+        return;
+      }
+      list.innerHTML = recentLogs.map(log => `
+        <div class="log-item-minimal">
+          <div class="log-icon-min">🔔</div>
+          <div class="log-text-min">
+            <strong>${log.user}</strong>: <code>${log.action}</code>
           </div>
-        `).join('');
-      } catch (err) {
-        list.innerHTML = '<div class="empty-state" style="color:var(--admin-danger)">Lỗi tải thông báo</div>';
-      }
-    },
-    async markAsRead(id, link) {
-      try {
-        await apiFetch(`/api/notifications/read/${id}`, { method: 'PUT' });
-        this.updateNotificationBadge();
-        if (link && link !== '#' && link !== 'undefined') {
-          window.location.href = link;
-        } else {
-          this.loadNotifications();
-        }
-      } catch (err) {
-        console.error('Mark as read failed:', err);
-      }
-    },
-    async updateNotificationBadge() {
-      try {
-        const json = await apiFetch('/api/notifications/unread-count');
-        const badge = document.querySelector('[data-notif-badge]');
-        if (badge) {
-          if (json.count > 0) {
-            badge.textContent = json.count > 20 ? '20+' : json.count;
-            badge.style.display = 'flex';
-          } else {
-            badge.style.display = 'none';
-          }
-        }
-      } catch (err) { /* silent fail */ }
+          <div class="log-time-min">${new Date(log.timestamp).toLocaleTimeString()}</div>
+        </div>
+      `).join('');
     },
     exportToCSV(type) {
       let data = [];
@@ -607,7 +571,6 @@
       loadDistributionChart();
       loadRankings();
       loadHealthStatus();
-      WanderUI.updateNotificationBadge();
 
       // Load overview data in background
       const refreshAll = () => {
@@ -657,7 +620,6 @@
       setInterval(refreshAll, 10000);
       // Faster polling for the activity stream ticker
       setInterval(() => pollActivityStream().catch(e => {}), 5000);
-      setInterval(() => WanderUI.updateNotificationBadge().catch(e => {}), 60000);
       
     } catch (e) {
       console.error('Admin bootstrap error:', e);
@@ -678,10 +640,10 @@
       overview: 'Tổng quan hệ thống',
       moderation: 'Duyệt nội dung',
       users: 'Quản lý người dùng',
-      broadcast: 'Gửi thông báo',
+      broadcast: 'Gửi thông báo hệ thống',
       logs: 'Nhật ký hệ thống',
       places: 'Kho địa điểm',
-      'admin-management': 'Quản lý Admin',
+      admins: 'Quản lý Admin',
       feedbacks: 'Phản hồi người dùng',
       itineraries: 'Lịch trình AI'
     };
@@ -728,15 +690,25 @@
           // --- Access Control Check ---
           const isSuperAdmin = currentAdmin.role === 'superadmin';
           const permissions = currentAdmin.permissions || ['overview'];
-          if (!isSuperAdmin && tab !== 'overview' && !permissions.includes(tab)) {
-            if (window.WanderUI) window.WanderUI.showToast('Bạn không có quyền truy cập khu vực này!', 'error');
-            else alert('Bạn không có quyền truy cập khu vực này. Vui lòng liên hệ Super Admin.');
+          
+          // Map tab names to permission names if they differ
+          const permMap = { 'broadcast': 'notifications' };
+          const requiredPerm = permMap[tab] || tab;
+
+          if (!isSuperAdmin && tab !== 'overview' && !permissions.includes(requiredPerm)) {
+            if (window.WanderUI && window.WanderUI.showToast) {
+              window.WanderUI.showToast('Bạn không có quyền truy cập khu vực này!', 'error');
+            } else {
+              alert('Bạn không có quyền truy cập khu vực này. Vui lòng liên hệ Super Admin.');
+            }
             
-            // Re-activate the previous tab button if possible
+            // Re-activate the previous tab to avoid black screen
+            if (previousTab) activeTab = previousTab;
             return;
           }
 
           panel.classList.remove('is-hidden');
+          panel.hidden = false;
           if (tab !== 'overview') {
             let titleEl = panel.querySelector('.panel-page-title');
             if (!titleEl) {
@@ -765,7 +737,9 @@
       case 'logs':
  await loadLogs('all'); break;
             case 'moderation': await loadModeration(); break;
-            case 'admin-management': await loadUsers(); break;
+            case 'broadcast':
+              if (typeof setupBroadcastForm === 'function') setupBroadcastForm();
+              break;
           }
         }
       });
@@ -2410,16 +2384,43 @@
       form.appendChild(status);
     }
 
+    // Quick URL Selector logic
+    const quickUrl = document.getElementById('quick-url-selector');
+    const linkInput = document.getElementById('broadcast-link-input');
+    if (quickUrl && linkInput) {
+      quickUrl.addEventListener('change', () => {
+        if (quickUrl.value) linkInput.value = quickUrl.value;
+      });
+    }
+
+    // Recipient Type logic (Show/Hide Target ID)
+    const recipientTypeSelect = document.getElementById('broadcast-recipient-type');
+    const targetIdLine = document.getElementById('target-id-line');
+    if (recipientTypeSelect && targetIdLine) {
+      recipientTypeSelect.addEventListener('change', () => {
+        targetIdLine.style.display = (recipientTypeSelect.value === 'SPECIFIC') ? 'flex' : 'none';
+      });
+    }
+
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       const fd = new FormData(form);
+      const rType = fd.get('recipientType');
+      const targetId = fd.get('targetId');
+      
       const body = {
         title: fd.get('title'),
         message: fd.get('message'),
-        recipientType: fd.get('recipientType'),
-        type: fd.get('type'),
-        link: fd.get('link')
+        link: fd.get('link'),
+        recipientType: (rType === 'SPECIFIC') ? targetId : rType,
+        type: fd.get('type')
       };
+
+      if (rType === 'SPECIFIC' && !targetId) {
+        status.textContent = '>> ERROR: Target ID is required for SPECIFIC mode';
+        status.style.color = '#f87171';
+        return;
+      }
 
       const btn = document.getElementById('btn-send-broadcast');
       if (window.WanderUI) window.WanderUI.setButtonLoading(btn, true);
@@ -2431,21 +2432,31 @@
           method: 'POST',
           body: JSON.stringify(body)
         });
+        
         if (res.success) {
           status.textContent = '>> SUCCESS: Broadcast delivered to network.';
           status.style.color = '#4ade80';
           form.reset();
+          if (targetIdLine) targetIdLine.style.display = 'none';
+          
+          // Silently refresh logs
+          if (typeof loadLogs === 'function') {
+             loadLogs('all').catch(err => console.warn('Refresh logs failed', err));
+          }
+          
           setTimeout(() => { status.textContent = ''; }, 3000);
-          loadRealtimeLogs();
         } else {
           status.textContent = '>> ERROR: ' + (res.message || 'Transmission failed');
           status.style.color = '#f87171';
         }
       } catch (err) {
-        status.textContent = '>> FATAL: Connection lost';
+        console.error('Broadcast Fatal Error:', err);
+        status.textContent = '>> FATAL: ' + (err.message || 'Connection lost');
         status.style.color = '#f87171';
       } finally {
-        if (window.WanderUI) window.WanderUI.setButtonLoading(btn, false);
+        if (window.WanderUI && window.WanderUI.setButtonLoading) {
+           window.WanderUI.setButtonLoading(btn, false);
+        }
       }
     });
   }

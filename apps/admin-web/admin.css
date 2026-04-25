@@ -1649,6 +1649,11 @@ select.command-input option {
   box-shadow: 0 0 8px #38bdf8;
 }
 
+.command-input option {
+  background-color: #1e293b;
+  color: #f8fafc;
+}
+
 .command-btn {
   width: 100%;
   padding: 1.1rem;

@@ -669,7 +669,7 @@
           </section>
 
           <!-- Broadcast Panel -->
-          <section id="panel-broadcast" class="admin-panel glass-panel" hidden>
+          <section id="panel-broadcast" class="admin-panel glass-panel is-hidden">
             <div class="admin-panel-header">
               <h2 class="section-title">Terminal Thông báo Hệ thống</h2>
               <p class="section-desc">Gửi lệnh phát dữ liệu rảnh tay tới toàn mạng lưới WanderViệt.</p>
@@ -688,14 +688,23 @@
                     <span class="command-prompt">root@wander:~$</span>
                     <span>select --recipient</span>
                     <div class="command-input-wrap">
-                      <select name="recipientType" class="command-input" style="appearance: none;">
-                        <option value="ALL">ALL_CHANNELS</option>
-                        <option value="BUSINESS">BUSINESS_PARTNERS</option>
-                        <option value="USER">TRAVELERS</option>
-                        <option value="ADMIN">ADMIN_STAFF</option>
+                      <select name="recipientType" id="broadcast-recipient-type" class="command-input" style="appearance: none;">
+                        <option value="ALL">ALL_SYSTEM_WIDE</option>
+                        <option value="USER">ALL_TRAVELERS</option>
+                        <option value="BUSINESS">ALL_BUSINESS_PARTNERS</option>
+                        <option value="ADMIN">ALL_ADMINISTRATORS</option>
+                        <option value="SPECIFIC">SPECIFIC_IDENTITY_ID</option>
                       </select>
                     </div>
                   </div>
+                  <div class="command-line" id="target-id-line" style="display: none;">
+                    <span class="command-prompt">root@wander:~$</span>
+                    <span>set --target-id</span>
+                    <div class="command-input-wrap">
+                      <input type="text" name="targetId" id="broadcast-target-id" class="command-input" placeholder="Paste User/Business/Admin ID here..." />
+                    </div>
+                  </div>
+                  
                   <div class="command-line">
                     <span class="command-prompt">root@wander:~$</span>
                     <span>set --type</span>
@@ -725,8 +734,16 @@
                   <div class="command-line">
                     <span class="command-prompt">root@wander:~$</span>
                     <span>attach --url</span>
-                    <div class="command-input-wrap">
-                      <input type="text" name="link" class="command-input" placeholder="Optional URL destination..." />
+                    <div class="command-input-wrap" style="display: flex; gap: 10px; width: 100%;">
+                      <input type="text" name="link" id="broadcast-link-input" class="command-input" placeholder="Optional URL destination..." />
+                      <select id="quick-url-selector" class="command-input" style="width: auto; min-width: 170px; appearance: none; cursor: pointer; border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; padding: 2px 8px; background: rgba(255,255,255,0.03);">
+                        <option value="">-- Quick Path --</option>
+                        <option value="/index.html">Trang chủ (User)</option>
+                        <option value="/planner.html">AI Planner</option>
+                        <option value="/profile.html">Hồ sơ cá nhân</option>
+                        <option value="/biz-dashboard.html">Dashboard Đối tác</option>
+                        <option value="/biz-listing.html">Quản lý dịch vụ (Biz)</option>
+                      </select>
                     </div>
                   </div>
                   
@@ -1181,7 +1198,7 @@
   <div id="drawer-notifications" class="slide-drawer" hidden>
     <div class="slide-drawer__inner">
       <div class="slide-drawer__header">
-        <h3 class="slide-drawer__title">🔔 Thông báo hệ thống</h3>
+        <h3 class="slide-drawer__title">Thông báo hệ thống</h3>
         <button type="button" class="slide-drawer__close" onclick="WanderUI.toggleNotificationDrawer()">&times;</button>
       </div>
       <div class="slide-drawer__body" id="notif-list">

@@ -865,6 +865,9 @@
       const [formData, setFormData] = useState(EMPTY_FORM);
       const [selectedBusinessId, setSelectedBusinessId] = useState('me');
       const [detailItem, setDetailItem] = useState(null);
+      const [conversations, setConversations] = useState([]);
+      const [activeConv, setActiveConv] = useState(null);
+      const [replyText, setReplyText] = useState('');
 
       // --- Chatbot State ---
       const [isChatOpen, setIsChatOpen] = useState(false);
@@ -920,27 +923,36 @@
       const [leaderboardData, setLeaderboardData] = useState([]);
 
       useEffect(() => {
-        const fetchItems = async () => {
+        const fetchData = async () => {
           const token = localStorage.getItem('biz_auth_token') || sessionStorage.getItem('biz_auth_token');
           if (!token) return;
           try {
             // Load items
             const res = await fetch('/api/business/places', { headers: { 'x-auth-token': token } });
             const json = await res.json();
-            if (json.success && json.data && json.data.length > 0) {
-              setItems(json.data);
-            } else {
-              setItems(DEMO_ITEMS);
+            if (json.success) {
+              setItems(json.data || []);
             }
+
+            // Load conversations
+            const cRes = await fetch('/api/business/messages', { headers: { 'x-auth-token': token } });
+            const cJson = await cRes.json();
+            if (cJson.success) {
+              setConversations(cJson.data || []);
+              if (cJson.data && cJson.data.length > 0 && !activeConv) {
+                setActiveConv(cJson.data[0]);
+              }
+            }
+
             // Load leaderboard
             const lRes = await fetch('/api/business/leaderboard');
             const lJson = await lRes.json();
             if (lJson.success) setLeaderboardData(lJson.data);
           } catch (e) {
-            setItems(DEMO_ITEMS);
+            console.error('Fetch error:', e);
           }
         };
-        fetchItems();
+        fetchData();
       }, [currentUser]);
 
       const filteredItems = useMemo(() => {
@@ -1034,6 +1046,36 @@
           } catch (e) {
             window.alert('Lỗi kết nối máy chủ');
           }
+        }
+      };
+
+      const handleReply = async () => {
+        if (!activeConv || !replyText.trim()) return;
+        const token = localStorage.getItem('biz_auth_token') || sessionStorage.getItem('biz_auth_token');
+        try {
+          const res = await fetch('/api/business/messages', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-auth-token': token },
+            body: JSON.stringify({
+              customerId: activeConv.customerId,
+              customerName: activeConv.customerName,
+              text: replyText
+            })
+          });
+          const json = await res.json();
+          if (json.success) {
+            setReplyText('');
+            // Refresh conversations
+            const cRes = await fetch('/api/business/messages', { headers: { 'x-auth-token': token } });
+            const cJson = await cRes.json();
+            if (cJson.success) {
+              setConversations(cJson.data);
+              const updated = cJson.data.find(c => c.customerId === activeConv.customerId);
+              if (updated) setActiveConv(updated);
+            }
+          }
+        } catch (e) {
+          window.alert('Lỗi gửi tin nhắn');
         }
       };
       const quickApprove = (id) => setItems((p) => p.map((x) => (x.id === id ? { ...x, status: 'approved' } : x)));
@@ -1430,44 +1472,57 @@
                         <input type="text" placeholder="Tìm hội thoại..." style={{ ...inputStyle, fontSize:'0.85rem' }} />
                       </div>
                       <div style={{ flex:1, overflowY:'auto' }}>
-                        {MOCK_MESSAGES.map((m) => (
-                          <div key={m.id} style={{ padding:'1rem', borderBottom:'1px solid var(--biz-border)', cursor:'pointer', background: m.unread ? 'rgba(0, 240, 255, 0.05)' : 'transparent', transition:'0.2s' }}>
+                        {conversations.length === 0 && (
+                          <div style={{ padding:'2rem', textAlign:'center', color:'var(--biz-text-muted)', fontSize:'0.9rem' }}>Chưa có tin nhắn nào</div>
+                        )}
+                        {conversations.map((c) => (
+                          <div key={c.customerId} onClick={() => setActiveConv(c)} style={{ padding:'1rem', borderBottom:'1px solid var(--biz-border)', cursor:'pointer', background: activeConv?.customerId === c.customerId ? 'rgba(0, 240, 255, 0.08)' : 'transparent', transition:'0.2s' }}>
                             <div style={{ display:'flex', justifyContent:'space-between', marginBottom:'0.25rem' }}>
-                              <strong style={{ fontSize:'0.95rem' }}>{m.sender}</strong>
-                              <span style={{ fontSize:'0.75rem', color:'var(--biz-text-muted)' }}>{m.time}</span>
+                              <strong style={{ fontSize:'0.95rem' }}>{c.customerName}</strong>
+                              <span style={{ fontSize:'0.75rem', color:'var(--biz-text-muted)' }}>{new Date(c.time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
                             </div>
-                            <div style={{ fontSize:'0.82rem', color: m.unread ? 'var(--biz-text)' : 'var(--biz-text-muted)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
-                              {m.text}
+                            <div style={{ fontSize:'0.82rem', color: c.unreadCount > 0 ? 'var(--biz-text)' : 'var(--biz-text-muted)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
+                              {c.lastMessage}
                             </div>
-                            <div style={{ marginTop:'0.4rem', fontSize:'0.7rem', color:'var(--biz-accent)', opacity:0.8 }}>
-                              {m.serviceId === 'admin' ? 'Hệ thống' : items.find(it => it.id === m.serviceId)?.name || 'Dịch vụ'}
-                            </div>
+                            {c.unreadCount > 0 && <div style={{ marginTop:'0.4rem', fontSize:'0.7rem', color:'var(--biz-accent)' }}>● {c.unreadCount} tin nhắn mới</div>}
                           </div>
                         ))}
                       </div>
                     </div>
                     <div style={{ background:'var(--biz-bg)', display:'flex', flexDirection:'column' }}>
-                      <div style={{ padding:'1rem 1.5rem', borderBottom:'1px solid var(--biz-border)', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-                        <div>
-                          <h3 style={{ margin:0, fontSize:'1.1rem' }}>Nguyễn Văn A</h3>
-                          <div style={{ fontSize:'0.8rem', color:'var(--biz-accent)' }}>Khách hàng quan tâm: Phố cổ Hội An</div>
+                      {activeConv ? (
+                        <>
+                          <div style={{ padding:'1rem 1.5rem', borderBottom:'1px solid var(--biz-border)', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+                            <div>
+                              <h3 style={{ margin:0, fontSize:'1.1rem' }}>{activeConv.customerName}</h3>
+                              <div style={{ fontSize:'0.8rem', color:'var(--biz-accent)' }}>ID: {activeConv.customerId}</div>
+                            </div>
+                          </div>
+                          <div style={{ flex:1, padding:'1.5rem', overflowY:'auto', display:'flex', flexDirection:'column', gap:'1rem' }}>
+                            {activeConv.messages.map((m, idx) => (
+                              <div key={idx} style={{ 
+                                alignSelf: m.senderRole === 'business' ? 'flex-end' : 'flex-start', 
+                                maxWidth:'80%', 
+                                background: m.senderRole === 'business' ? 'var(--biz-primary)' : 'var(--biz-surface-light)', 
+                                padding:'0.8rem 1rem', 
+                                borderRadius: m.senderRole === 'business' ? '14px 14px 0 14px' : '14px 14px 14px 0', 
+                                fontSize:'0.9rem' 
+                              }}>
+                                {m.text}
+                                <div style={{ fontSize:'0.7rem', opacity:0.5, marginTop:'0.4rem' }}>{new Date(m.createdAt).toLocaleTimeString()}</div>
+                              </div>
+                            ))}
+                          </div>
+                          <div style={{ padding:'1.2rem', borderTop:'1px solid var(--biz-border)', display:'flex', gap:'0.8rem' }}>
+                            <input type="text" placeholder="Nhập tin nhắn..." value={replyText} onChange={(e) => setReplyText(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleReply()} style={inputStyle} />
+                            <button className="btn-biz btn-biz--primary" onClick={handleReply}>Gửi</button>
+                          </div>
+                        </>
+                      ) : (
+                        <div style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', color:'var(--biz-text-muted)' }}>
+                          Chọn một hội thoại để bắt đầu
                         </div>
-                        <button className="btn-biz btn-biz--ghost" style={{ fontSize:'0.8rem' }}>Xem thông tin</button>
-                      </div>
-                      <div style={{ flex:1, padding:'1.5rem', overflowY:'auto', display:'flex', flexDirection:'column', gap:'1rem' }}>
-                        <div style={{ alignSelf:'flex-start', maxWidth:'80%', background:'var(--biz-surface-light)', padding:'0.8rem 1rem', borderRadius:'14px 14px 14px 0', fontSize:'0.9rem' }}>
-                          Chào doanh nghiệp, tôi thấy Phố cổ Hội An rất đẹp. Nếu tôi đi đoàn 20 người thì có chính sách giá ưu đãi không?
-                          <div style={{ fontSize:'0.7rem', opacity:0.5, marginTop:'0.4rem' }}>10:30</div>
-                        </div>
-                        <div style={{ alignSelf:'flex-end', maxWidth:'80%', background:'var(--biz-primary)', padding:'0.8rem 1rem', borderRadius:'14px 14px 0 14px', fontSize:'0.9rem' }}>
-                          Chào bạn, cảm ơn bạn đã quan tâm. Với đoàn 20 người chúng tôi có chiết khấu 15% tổng hóa đơn và tặng kèm hướng dẫn viên miễn phí nhé!
-                          <div style={{ fontSize:'0.7rem', opacity:0.7, marginTop:'0.4rem' }}>10:35</div>
-                        </div>
-                      </div>
-                      <div style={{ padding:'1.2rem', borderTop:'1px solid var(--biz-border)', display:'flex', gap:'0.8rem' }}>
-                        <input type="text" placeholder="Nhập tin nhắn..." style={inputStyle} />
-                        <button className="btn-biz btn-biz--primary">Gửi</button>
-                      </div>
+                      )}
                     </div>
                   </div>
                 </div>

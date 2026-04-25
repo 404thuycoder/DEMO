@@ -6,7 +6,35 @@ const { businessAuth } = require('./auth');
 const upload = require('../middlewares/upload');
 const logAction = require('../utils/logger');
 const BusinessAccount = require('../models/BusinessAccount');
+const BusinessMessage = require('../models/BusinessMessage');
 const { syncBusinessXP } = require('../utils/rankUtils');
+
+const safeParseArray = (req, field, forceObjectArray = false) => {
+  let val = req.body[field];
+  if (val === null || val === undefined) return [];
+  if (Array.isArray(val)) return val;
+  if (typeof val === 'string') {
+    val = val.trim();
+    if (!val || val === '[]' || val === 'null' || val === 'undefined') return [];
+    
+    try {
+      const tryJson = val.replace(/'/g, '"');
+      const parsed = JSON.parse(tryJson);
+      if (Array.isArray(parsed)) {
+        if (forceObjectArray) return parsed.filter(item => typeof item === 'object' && item !== null);
+        return parsed;
+      }
+      return [parsed];
+    } catch (e) {
+      if (forceObjectArray) return [];
+      if (val.includes(',')) {
+        return val.split(',').map(s => s.trim().replace(/^['"\[]|['"\]]$/g, '')).filter(Boolean);
+      }
+      return [val.replace(/^['"\[]|['"\]]$/g, '').trim()];
+    }
+  }
+  return forceObjectArray ? [] : [val];
+};
 
 // GET /api/business/reviews — feedbacks for this business's places
 router.get('/reviews', businessAuth, async (req, res) => {
@@ -117,40 +145,44 @@ router.post('/places', businessAuth, upload.array('imageFile', 10), async (req, 
     
     imagesArr = [...new Set(imagesArr)];
 
-    // Parse amenities from JSON string
-    let amenitiesArr = [];
-    if (req.body.amenities) {
-      try { amenitiesArr = JSON.parse(req.body.amenities); } catch(e) { amenitiesArr = [req.body.amenities]; }
-    }
-
-    let highlights = req.body.highlights || [];
-    if (typeof highlights === 'string') {
-      try { highlights = JSON.parse(highlights); } catch(e) { highlights = highlights.split(',').map(h => h.trim()).filter(Boolean); }
-    }
-
-    const parseJsonArray = (field) => {
-      if (typeof req.body[field] === 'string') {
-        try { return JSON.parse(req.body[field]); } catch (e) { return []; }
-      }
-      return req.body[field] || [];
-    };
+    const amenitiesArr = safeParseArray(req, 'amenities');
+    const highlightsArr = safeParseArray(req, 'highlights');
+    const tagsArr = safeParseArray(req, 'tags');
 
     const newPlace = new Place({
-      ...req.body,
+      name: req.body.name,
+      kind: req.body.kind,
+      region: req.body.region,
+      address: req.body.address,
+      description: req.body.description,
+      overview: req.body.overview,
+      experience: req.body.experience,
+      themeColor: req.body.themeColor,
+      meta: req.body.meta,
+      priceFrom: req.body.priceFrom,
+      priceTo: req.body.priceTo,
+      openTime: req.body.openTime,
+      closeTime: req.body.closeTime,
+      openDays: req.body.openDays,
+      contactPhone: req.body.contactPhone,
+      contactEmail: req.body.contactEmail,
+      website: req.body.website,
+      lat: req.body.lat,
+      lng: req.body.lng,
       id: 'biz-' + Date.now(),
       ownerId: req.user.id,
       image: imagesArr[0] || '',
       images: imagesArr,
-      highlights: highlights,
-      tags: typeof req.body.tags === 'string' ? req.body.tags.split(',').map(t => t.trim()).filter(Boolean) : (req.body.tags || []),
+      highlights: highlightsArr,
+      tags: tagsArr,
       amenities: amenitiesArr,
       top: req.body.top === 'true',
       status: 'pending',
       source: 'partner',
-      amusementPlaces: parseJsonArray('amusementPlaces'),
-      accommodations: parseJsonArray('accommodations'),
-      diningPlaces: parseJsonArray('diningPlaces'),
-      checkInSpots: parseJsonArray('checkInSpots')
+      amusementPlaces: safeParseArray(req, 'amusementPlaces', true),
+      accommodations: safeParseArray(req, 'accommodations', true),
+      diningPlaces: safeParseArray(req, 'diningPlaces', true),
+      checkInSpots: safeParseArray(req, 'checkInSpots', true)
     });
 
     await newPlace.save();
@@ -193,40 +225,36 @@ router.put('/places/:id', businessAuth, upload.array('imageFile', 10), async (re
 
     imagesArr = [...new Set(imagesArr.filter(i => Boolean(i)))];
 
-    let highlights = req.body.highlights;
-    if (highlights !== undefined) {
-      if (typeof highlights === 'string') {
-        try { highlights = JSON.parse(highlights); } catch(e) { highlights = highlights.split(',').map(h => h.trim()).filter(Boolean); }
-      }
-    }
-
-    const parseJsonArray = (field) => {
-      if (typeof req.body[field] === 'string') {
-        try { return JSON.parse(req.body[field]); } catch (e) { return undefined; }
-      }
-      return req.body[field];
-    };
-
     const updates = {
-      ...req.body,
+      name: req.body.name,
+      kind: req.body.kind,
+      region: req.body.region,
+      address: req.body.address,
+      description: req.body.description,
+      overview: req.body.overview,
+      experience: req.body.experience,
+      themeColor: req.body.themeColor,
+      meta: req.body.meta,
+      priceFrom: req.body.priceFrom,
+      priceTo: req.body.priceTo,
+      openTime: req.body.openTime,
+      closeTime: req.body.closeTime,
+      openDays: req.body.openDays,
+      contactPhone: req.body.contactPhone,
+      contactEmail: req.body.contactEmail,
+      website: req.body.website,
+      lat: req.body.lat,
+      lng: req.body.lng,
       image: imagesArr[0] || '',
       images: imagesArr,
-      tags: typeof req.body.tags === 'string' ? req.body.tags.split(',').map(t => t.trim()) : req.body.tags,
+      tags: safeParseArray(req, 'tags'),
+      amenities: safeParseArray(req, 'amenities'),
+      highlights: safeParseArray(req, 'highlights'),
+      amusementPlaces: safeParseArray(req, 'amusementPlaces', true),
+      accommodations: safeParseArray(req, 'accommodations', true),
+      diningPlaces: safeParseArray(req, 'diningPlaces', true),
+      checkInSpots: safeParseArray(req, 'checkInSpots', true)
     };
-    
-    const amusementPlaces = parseJsonArray('amusementPlaces');
-    if (amusementPlaces !== undefined) updates.amusementPlaces = amusementPlaces;
-    
-    const accommodations = parseJsonArray('accommodations');
-    if (accommodations !== undefined) updates.accommodations = accommodations;
-    
-    const diningPlaces = parseJsonArray('diningPlaces');
-    if (diningPlaces !== undefined) updates.diningPlaces = diningPlaces;
-    
-    const checkInSpots = parseJsonArray('checkInSpots');
-    if (checkInSpots !== undefined) updates.checkInSpots = checkInSpots;
-
-    if (highlights !== undefined) updates.highlights = highlights;
     
     // If a business updates an approved place, it goes back to pending for re-review
     if (req.user.role === 'business') {
@@ -255,7 +283,60 @@ router.delete('/places/:id', businessAuth, async (req, res) => {
   }
 });
 
-// 5. Get business leaderboard
+// 5. Get business messages (Inbox)
+router.get('/messages', businessAuth, async (req, res) => {
+  try {
+    // Get all messages for this business
+    const messages = await BusinessMessage.find({ businessId: req.user.id })
+      .sort({ createdAt: -1 })
+      .lean();
+    
+    // Group messages by customerId to create "conversations"
+    const conversations = [];
+    const customerIds = [...new Set(messages.map(m => m.customerId))];
+    
+    customerIds.forEach(cId => {
+      const customerMsgs = messages.filter(m => m.customerId === cId);
+      conversations.push({
+        customerId: cId,
+        customerName: customerMsgs[0].customerName,
+        lastMessage: customerMsgs[0].text,
+        time: customerMsgs[0].createdAt,
+        unreadCount: customerMsgs.filter(m => !m.isRead && m.senderRole === 'customer').length,
+        messages: customerMsgs.reverse() // chronological order for detail view
+      });
+    });
+
+    res.json({ success: true, data: conversations });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// 6. Send message from business
+router.post('/messages', businessAuth, async (req, res) => {
+  try {
+    const { customerId, text, serviceId, customerName } = req.body;
+    if (!text || !customerId) return res.status(400).json({ success: false, message: 'Missing data' });
+
+    const newMessage = new BusinessMessage({
+      businessId: req.user.id,
+      customerId,
+      customerName: customerName || 'Khách hàng',
+      senderRole: 'business',
+      text,
+      serviceId,
+      isRead: true // Business's own messages are "read" by them
+    });
+
+    await newMessage.save();
+    res.json({ success: true, data: newMessage });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// 7. Get business leaderboard
 router.get('/leaderboard', async (req, res) => {
   try {
     const topBusinesses = await BusinessAccount.find()
