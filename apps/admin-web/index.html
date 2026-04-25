@@ -1,0 +1,1447 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WanderViệt — Quản Trị Hệ Thống</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:ital,wght@0,400;0,500;0,600;0,700&family=Outfit:wght@500;600;700&display=swap"
+    rel="stylesheet" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css?v=1776819067174" crossorigin="" />
+  <link rel="stylesheet" href="global-tokens.css?v=1776819067174" />
+  <link rel="stylesheet" href="admin.css?v=202604240718" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="SharedUI.js?v=1776819067174"></script>
+</head>
+
+<body class="admin-body">
+  <!-- Premium Welcome Overlay -->
+  <div id="welcome-overlay" class="welcome-overlay">
+    <div class="welcome-content">
+      <div class="welcome-logo-wrap">
+        <img src="../../user-web/assets/logo.png" alt="Logo" class="welcome-logo" onerror="this.src='https://ui-avatars.com/api/?name=Wander+Viet&background=6366f1&color=fff'">
+      </div>
+      <h1 class="welcome-title">Chào mừng trở lại, <span id="welcome-admin-name">Quản trị viên</span></h1>
+      <p class="welcome-subtitle">Hệ thống WanderViệt đã sẵn sàng phục vụ bạn.</p>
+      <div class="welcome-loader">
+        <div class="loader-bar"></div>
+      </div>
+    </div>
+  </div>
+  <header class="site-header admin-header">
+    <div class="container header-inner">
+      <div class="header-left">
+        <a href="/index.html" class="logo">
+          <span class="logo-mark">◈</span>
+          WanderViệt <span class="badge-admin">ADMIN</span>
+        </a>
+      </div>
+      
+      <div class="header-right">
+        <!-- Live System Pulse -->
+        <div class="system-pulse-wrap" id="header-pulse" style="display: flex; align-items: center; gap: 8px; margin-right: 15px; padding: 4px 10px; background: rgba(16, 185, 129, 0.1); border-radius: 20px; border: 1px solid rgba(16, 185, 129, 0.2);">
+          <div class="pulse-dot" style="width: 7px; height: 7px; background: #10b981; border-radius: 50%; box-shadow: 0 0 8px #10b981;"></div>
+          <span style="font-size: 10px; font-weight: 700; color: #10b981; letter-spacing: 0.5px;">LIVE</span>
+          <span id="header-latency" style="font-size: 10px; color: #94a3b8; font-family: monospace; border-left: 1px solid rgba(16,185,129,0.3); padding-left: 8px;">--ms</span>
+        </div>
+
+        <!-- Live Clock -->
+        <span id="admin-clock"></span>
+
+        <!-- Global Search -->
+        <button type="button" id="w-btn-search-trigger" aria-label="Tìm kiếm">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          Tìm kiếm...
+          <kbd>Ctrl K</kbd>
+        </button>
+
+        <!-- Settings Customizer -->
+        <button type="button" class="notif-btn" onclick="WanderUI.toggleSettingsDrawer()" aria-label="Cài đặt">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </button>
+
+        <!-- Notification Bell -->
+        <button type="button" class="notif-btn" onclick="WanderUI.toggleNotificationDrawer()" aria-label="Thông báo">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+          <span class="wander-notif-badge" data-notif-badge></span>
+        </button>
+        
+        <div class="admin-profile" id="admin-profile-head">
+          <img src="" alt="Admin" class="admin-profile-img" id="admin-avatar-head" />
+          <div class="admin-profile-info">
+            <span class="admin-profile-name" id="admin-name-head">Admin</span>
+            <span class="admin-profile-role">Super Admin</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ===== ADMIN LOGIN OVERLAY ===== -->
+  <div id="admin-login-overlay" style="
+    position:fixed; inset:0; z-index:2000;
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 60%, #0f172a 100%);
+    display:none; align-items:center; justify-content:center;
+    font-family: var(--font-body, 'Be Vietnam Pro', sans-serif);
+  ">
+    <!-- Decorative orbs -->
+    <div style="position:absolute;width:500px;height:500px;border-radius:50%;background:radial-gradient(circle,rgba(56,189,248,0.15),transparent 70%);top:-150px;left:-100px;pointer-events:none;"></div>
+    <div style="position:absolute;width:400px;height:400px;border-radius:50%;background:radial-gradient(circle,rgba(167,139,250,0.12),transparent 70%);bottom:-100px;right:-50px;pointer-events:none;"></div>
+
+    <div style="
+      background: rgba(255,255,255,0.05);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border: 1px solid rgba(255,255,255,0.1);
+      box-shadow: 0 24px 64px rgba(0,0,0,0.5);
+      border-radius: 24px;
+      padding: 2.5rem 2.75rem;
+      width: 100%;
+      max-width: 420px;
+      position: relative;
+      z-index: 1;
+    ">
+      <!-- Logo -->
+      <div style="text-align:center; margin-bottom:1.75rem;">
+        <div style="font-size:2.5rem; margin-bottom:0.5rem;">🛡️</div>
+        <h1 style="margin:0; font-size:1.5rem; font-family:var(--font-head,'Outfit',sans-serif); font-weight:700; background:linear-gradient(135deg,#38bdf8,#a78bfa); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;">WanderViệt Admin</h1>
+        <p style="margin:0.4rem 0 0; font-size:0.85rem; color:rgba(148,163,184,0.8);">Truy cập chỉ dành cho Quản trị viên</p>
+      </div>
+
+      <!-- Login Form -->
+      <form id="admin-login-form" style="display:flex; flex-direction:column; gap:1rem;">
+        <div>
+          <label style="display:block; font-size:0.8rem; font-weight:600; color:rgba(148,163,184,0.9); margin-bottom:0.4rem; letter-spacing:0.05em; text-transform:uppercase;">Email</label>
+          <input id="admin-login-email" type="email" required autocomplete="email"
+            placeholder="admin@wanderviet.com"
+            style="width:100%; padding:0.75rem 1rem; border-radius:10px; background:rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.12); color:#f8fafc; font-size:0.95rem; font-family:inherit; box-sizing:border-box; outline:none; transition:border-color 0.2s, box-shadow 0.2s;"
+            onfocus="this.style.borderColor='#38bdf8'; this.style.boxShadow='0 0 0 3px rgba(56,189,248,0.15)'"
+            onblur="this.style.borderColor='rgba(255,255,255,0.12)'; this.style.boxShadow='none'"
+          />
+        </div>
+        <div>
+          <label style="display:block; font-size:0.8rem; font-weight:600; color:rgba(148,163,184,0.9); margin-bottom:0.4rem; letter-spacing:0.05em; text-transform:uppercase;">Mật khẩu</label>
+          <input id="admin-login-password" type="password" required autocomplete="current-password"
+            placeholder="••••••••"
+            style="width:100%; padding:0.75rem 1rem; border-radius:10px; background:rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.12); color:#f8fafc; font-size:0.95rem; font-family:inherit; box-sizing:border-box; outline:none; transition:border-color 0.2s, box-shadow 0.2s;"
+            onfocus="this.style.borderColor='#38bdf8'; this.style.boxShadow='0 0 0 3px rgba(56,189,248,0.15)'"
+            onblur="this.style.borderColor='rgba(255,255,255,0.12)'; this.style.boxShadow='none'"
+          />
+        </div>
+        <button type="submit" id="admin-login-btn"
+          style="margin-top:0.5rem; padding:0.85rem; border-radius:12px; border:none; background:linear-gradient(135deg,#38bdf8,#6366f1); color:#fff; font-size:1rem; font-weight:700; font-family:inherit; cursor:pointer; transition:transform 0.2s, box-shadow 0.2s; box-shadow:0 4px 16px rgba(56,189,248,0.35);"
+          onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 8px 24px rgba(56,189,248,0.45)'"
+          onmouseout="this.style.transform=''; this.style.boxShadow='0 4px 16px rgba(56,189,248,0.35)'"
+        >Đăng nhập Quản trị</button>
+        <p id="admin-login-msg" style="margin:0; text-align:center; font-size:0.875rem; min-height:1.25rem; color:#f87171;"></p>
+      </form>
+
+      <p style="margin:1.25rem 0 0; text-align:center; font-size:0.78rem; color:rgba(148,163,184,0.5);">
+        Chỉ tài khoản có quyền Admin mới được truy cập.
+      </p>
+    </div>
+  </div>
+
+  <main id="main" class="admin-main">
+    <div class="admin-layout">
+      <!-- Sidebar -->
+      <aside class="admin-sidebar" id="admin-sidebar">
+        <div class="admin-sidebar__header">
+          <h2 class="admin-sidebar__title">◈ WanderViệt Admin</h2>
+          <p class="admin-sidebar__desc">Cổng quản trị tối cao</p>
+        </div>
+        <nav class="sidebar-nav" role="tablist">
+          <button type="button" class="sidebar-btn is-active" data-admin-tab="overview">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+            Tổng quan
+          </button>
+          <button type="button" class="sidebar-btn" data-admin-tab="moderation">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            Duyệt nội dung 
+            <span class="badge-count" id="badge-pending-count" hidden>0</span>
+          </button>
+          <button type="button" class="sidebar-btn" data-admin-tab="ai-intelligence">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8z"/><path d="M12 6a6 6 0 1 0 6 6 6 6 0 0 0-6-6zm0 10a4 4 0 1 1 4-4 4 4 0 0 1-4 4z"/></svg>
+            Trí tuệ AI
+            <span class="badge-ai-new">NEW</span>
+          </button>
+          <button type="button" class="sidebar-btn" data-admin-tab="users">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            Người dùng
+          </button>
+          <button type="button" class="sidebar-btn" data-admin-tab="broadcast">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.3 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10l-3.1 3.1a2 2 0 0 1-1.4.6H10.3z"/><path d="M15 8h.01"/><path d="M10 8h.01"/><path d="M7 8h.01"/><path d="M7 12h10"/><path d="M7 16h6"/></svg>
+            Gửi thông báo
+          </button>
+          <button type="button" class="sidebar-btn" data-admin-tab="logs">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+            Nhật ký hệ thống
+          </button>
+          <button type="button" class="sidebar-btn" data-admin-tab="places">
+             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+             Kho địa điểm
+          </button>
+          <button type="button" class="sidebar-btn" data-admin-tab="admin-management">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><path d="M20 8v6"/><path d="M23 11h-6"/></svg>
+            Quản lý Admin
+          </button>
+          <button type="button" class="sidebar-btn" data-admin-tab="knowledge">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+            Dữ liệu AI
+          </button>
+          
+          <div class="sidebar-divider"></div>
+          
+          <button type="button" class="sidebar-btn logout-btn" data-admin-logout>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+            Đăng xuất
+          </button>
+        </nav>
+
+        <div class="sidebar-footer">
+          <img src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=40&q=80" 
+               id="sidebar-admin-avatar" class="sidebar-user-avatar" alt="Admin" 
+               style="cursor:pointer" title="Chỉnh sửa hồ sơ" />
+          <div class="sidebar-user-info">
+            <strong id="sidebar-admin-name">Super Admin</strong>
+            <span id="sidebar-admin-email">admin@wanderviet.com</span>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Main Content -->
+      <div class="admin-main-content">
+        <div id="admin-error" class="admin-error-box" hidden>
+          <strong>⛔ Truy cập bị từ chối.</strong> Bạn cần đăng nhập bằng tài khoản Admin để xem trang này.<br />
+          <a href="/index.html" style="color:inherit;text-decoration:underline">← Quay lại & đăng nhập</a>
+        </div>
+        <div id="admin-content" class="is-hidden">
+          <!-- Global Navigation Bar (Always Visible) -->
+          <div class="admin-global-nav">
+            <div style="display:flex; align-items:center;">
+              <button class="btn btn--ghost btn--small" id="global-back-btn" style="display:none; color: #a78bfa; gap: 0.5rem; background: rgba(139, 92, 246, 0.1); border: 1px solid rgba(139, 92, 246, 0.2); border-radius: 8px; padding: 0.5rem 1rem;">
+                <i class="fas fa-arrow-left"></i> Quay lại
+              </button>
+              <div id="active-panel-title" style="margin-left: 1rem; font-weight: 700; font-size: 1.1rem; letter-spacing: 0.5px;">Tổng quan hệ thống</div>
+            </div>
+            
+            <!-- AI Command Sentinel Trigger -->
+            <button id="ai-sentinel-trigger" class="btn--ai-trigger" title="AI Command Sentinel">
+              <span class="ai-trigger-icon">🧠</span>
+              <span class="ai-trigger-text">AI Sentinel</span>
+              <span class="ai-pulse-ring"></span>
+            </button>
+          </div>
+
+          <!-- AI Assistant Side Drawer (Standard WanderUI component pattern) -->
+          <div id="drawer-ai-assistant" class="admin-drawer right-drawer" hidden>
+            <div class="drawer-header">
+              <div class="drawer-header-left">
+                <span class="drawer-icon ai-glow">✨</span>
+                <div>
+                  <h3 class="drawer-title">AI Command Sentinel</h3>
+                  <span class="drawer-status"><span class="status-dot status-online"></span> Hệ thống đang túc trực</span>
+                </div>
+              </div>
+              <button class="drawer-close" onclick="WanderUI.toggleAIDrawer()">✕</button>
+            </div>
+            <div class="drawer-body">
+              <div id="ai-chat-messages" class="ai-chat-container">
+                <div class="ai-message bot">
+                  <div class="ai-message-content">
+                    Chào Super Admin. Tôi là AI Sentinel, hệ thống hỗ trợ điều hành WanderViệt. Tôi có thể giúp gì cho bạn hôm nay?
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="ai-chat-input-area">
+              <input type="text" id="ai-chat-input" placeholder="Nhập lệnh hoặc câu hỏi điều hành..." />
+              <button id="ai-chat-send-btn" class="btn--send-ai"><i class="fas fa-paper-plane"></i></button>
+            </div>
+          </div>
+
+          <!-- Settings Drawer -->
+          <div id="drawer-settings" class="admin-drawer right-drawer" hidden>
+            <div class="drawer-header">
+              <div class="drawer-header-left">
+                <span class="drawer-icon">⚙️</span>
+                <div>
+                  <h3 class="drawer-title">Cài đặt Hệ thống</h3>
+                  <span class="drawer-status">Tùy chỉnh không gian làm việc</span>
+                </div>
+              </div>
+              <button class="drawer-close" onclick="WanderUI.toggleSettingsDrawer()">✕</button>
+            </div>
+            <div class="drawer-body settings-drawer-body">
+              <!-- NHÓM 1: GIAO DIỆN -->
+              <div class="settings-group">
+                <h4 class="settings-group-title">🎨 Tùy chỉnh Giao diện</h4>
+                
+                <div class="settings-item">
+                  <div class="settings-item-info">
+                    <span class="settings-label">Hình nền (Theme Preset)</span>
+                  </div>
+                  <div class="bg-preset-grid">
+                    <button class="bg-preset-btn is-active" data-preset="default">Default</button>
+                    <button class="bg-preset-btn" data-preset="midnight">Midnight</button>
+                    <button class="bg-preset-btn" data-preset="forest">Forest</button>
+                    <button class="bg-preset-btn" data-preset="slate">Slate</button>
+                    <button class="bg-preset-btn" data-preset="purple">Purple</button>
+                  </div>
+                </div>
+
+                <div class="settings-item">
+                  <div class="settings-item-info">
+                    <span class="settings-label">Màu chủ đạo (Accent Color)</span>
+                  </div>
+                  <div class="color-picker-grid" id="settings-accent-colors">
+                    <button class="color-btn is-active" data-color="#3b82f6" style="--c: #3b82f6"></button>
+                    <button class="color-btn" data-color="#10b981" style="--c: #10b981"></button>
+                    <button class="color-btn" data-color="#ef4444" style="--c: #ef4444"></button>
+                    <button class="color-btn" data-color="#f59e0b" style="--c: #f59e0b"></button>
+                    <button class="color-btn" data-color="#8b5cf6" style="--c: #8b5cf6"></button>
+                    <button class="color-btn" data-color="#06b6d4" style="--c: #06b6d4"></button>
+                  </div>
+                </div>
+
+                <div class="settings-item">
+                  <div class="settings-item-info">
+                    <span class="settings-label">Mức độ Bo góc</span>
+                    <span class="settings-desc">Độ cong của các thẻ panel</span>
+                  </div>
+                  <select id="settings-radius" class="settings-select">
+                    <option value="0px">Vuông góc (Sharp)</option>
+                    <option value="16px" selected>Bo vừa (Mặc định)</option>
+                    <option value="24px">Bo tròn (Rounded)</option>
+                  </select>
+                </div>
+
+                <div class="settings-item">
+                  <div class="settings-item-info">
+                    <span class="settings-label">Độ mờ Gương (Glass Blur)</span>
+                  </div>
+                  <select id="settings-blur" class="settings-select">
+                    <option value="8px">Thấp (Tốt cho máy yếu)</option>
+                    <option value="24px" selected>Trung bình (Mặc định)</option>
+                    <option value="40px">Cao (Đẹp nhất)</option>
+                  </select>
+                </div>
+                
+                <div class="settings-item settings-item--toggle">
+                  <div class="settings-item-info">
+                    <span class="settings-label">Thu gọn Menu (Focus Mode)</span>
+                    <span class="settings-desc">Ẩn chữ ở sidebar, tối đa không gian</span>
+                  </div>
+                  <label class="switch">
+                    <input type="checkbox" id="settings-focus-mode">
+                    <span class="slider"></span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- NHÓM 2: HIỆU ỨNG -->
+              <div class="settings-group">
+                <h4 class="settings-group-title">✨ Hiệu ứng & Âm thanh</h4>
+                
+                <div class="settings-item settings-item--toggle">
+                  <div class="settings-item-info">
+                    <span class="settings-label">Viền sáng chạy (Neon Borders)</span>
+                    <span class="settings-desc">Dải LED xoay quanh các hộp Glass</span>
+                  </div>
+                  <label class="switch">
+                    <input type="checkbox" id="settings-neon-borders" checked>
+                    <span class="slider"></span>
+                  </label>
+                </div>
+
+                <div class="settings-item settings-item--toggle">
+                  <div class="settings-item-info">
+                    <span class="settings-label">Sọc CRT (Scanlines)</span>
+                    <span class="settings-desc">Hiệu ứng sọc mờ của màn hình cổ điển</span>
+                  </div>
+                  <label class="switch">
+                    <input type="checkbox" id="settings-crt" checked>
+                    <span class="slider"></span>
+                  </label>
+                </div>
+
+                <div class="settings-item settings-item--toggle">
+                  <div class="settings-item-info">
+                    <span class="settings-label">Hạt Không gian (Particles)</span>
+                    <span class="settings-desc">Hạt sáng li ti lơ lửng ở hình nền</span>
+                  </div>
+                  <label class="switch">
+                    <input type="checkbox" id="settings-particles">
+                    <span class="slider"></span>
+                  </label>
+                </div>
+
+                <div class="settings-item settings-item--toggle">
+                  <div class="settings-item-info">
+                    <span class="settings-label">Âm thanh UI (Sounds)</span>
+                    <span class="settings-desc">Phát tiếng động cơ học khi thao tác</span>
+                  </div>
+                  <label class="switch">
+                    <input type="checkbox" id="settings-sounds">
+                    <span class="slider"></span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- NHÓM 3: HỆ THỐNG -->
+              <div class="settings-group">
+                <h4 class="settings-group-title">⚙️ Hệ thống</h4>
+                
+                <div class="settings-item settings-item--toggle">
+                  <div class="settings-item-info">
+                    <span class="settings-label">Đồng hồ 12h/24h</span>
+                    <span class="settings-desc">Bật để dùng AM/PM thay cho 24h</span>
+                  </div>
+                  <label class="switch">
+                    <input type="checkbox" id="settings-time-12h">
+                    <span class="slider"></span>
+                  </label>
+                </div>
+
+                <div class="settings-item settings-item--toggle">
+                  <div class="settings-item-info">
+                    <span class="settings-label" style="color: var(--admin-warning);">Chế độ Tối giản (Performance)</span>
+                    <span class="settings-desc">Tắt mọi hiệu ứng làm nặng máy</span>
+                  </div>
+                  <label class="switch">
+                    <input type="checkbox" id="settings-performance">
+                    <span class="slider"></span>
+                  </label>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- Backdrop for modals/drawers -->
+          <div id="admin-modal-backdrop" class="modal-backdrop" hidden onclick="WanderUI.closeAllDrawers()"></div>
+
+          <!-- ===== OVERVIEW PANEL — EVERYTHING HOME PAGE GOES HERE ===== -->
+          <section id="panel-overview" class="admin-panel">
+            <div id="overview-shell">
+              <!-- Sleek AI Insight Bar -->
+              <div id="ai-insight-bar" class="ai-insight-bar">
+                <span class="ai-insight-icon">✨</span>
+                <span class="ai-insight-label">AI Insight</span>
+                <p id="ai-insight-msg">Đang phân tích dữ liệu hệ thống...</p>
+              </div>
+
+              <div class="panel-header-top">
+                <div class="header-left">
+                  <h1 class="main-title" style="cursor:pointer" onclick="document.querySelector('.sidebar-btn[data-admin-tab=\'overview\']').click()">Tổng quan hệ thống</h1>
+                </div>
+                <p class="main-subtitle">Chào mừng trở lại, đây là những gì đang diễn ra hôm nay.</p>
+                
+                <!-- Quick Actions -->
+                <div class="quick-actions" style="margin-top:1rem;">
+                  <button class="quick-action-btn" data-admin-tab="users">👥 Người dùng</button>
+                  <button class="quick-action-btn" data-admin-tab="places">📍 Điểm đến</button>
+                  <button class="quick-action-btn" data-admin-tab="moderation">✅ Duyệt nội dung</button>
+                  <button class="quick-action-btn" data-admin-tab="logs">📜 Nhật ký</button>
+                </div>
+              </div>
+
+              <!-- Key Stats Row -->
+
+              <div class="stats-row" id="admin-stats" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.5rem; margin-bottom: 2rem;">
+                <div class="stat-card stat-card--blue"><div class="stat-icon-wrap">👥</div><div class="stat-data"><div class="stat-label">Tổng Người Dùng</div><div class="stat-val" id="stat-total-users">—</div></div></div>
+                <div class="stat-card stat-card--green"><div class="stat-icon-wrap">🏨</div><div class="stat-data"><div class="stat-label">Doanh Nghiệp</div><div class="stat-val" id="stat-total-biz">—</div></div></div>
+                <div class="stat-card stat-card--purple"><div class="stat-icon-wrap">⚡</div><div class="stat-data"><div class="stat-label">Tương Tác</div><div class="stat-val" id="stat-daily-interactions">—</div></div></div>
+                <div class="stat-card stat-card--yellow"><div class="stat-icon-wrap">✨</div><div class="stat-data"><div class="stat-label">Lịch trình AI</div><div class="stat-val" id="stat-total-iti">—</div></div></div>
+              </div>
+
+              <!-- Main Charts Grid -->
+              <div class="overview-grid">
+                <div class="overview-left">
+                  <div class="glass-panel chart-box">
+                    <div class="chart-header" style="margin-bottom:1rem"><h3>📊 Phân bổ Thành viên</h3></div>
+                    <div class="chart-container" style="height: 250px;"><canvas id="distributionChart"></canvas></div>
+                  </div>
+                </div>
+
+                <div class="overview-center">
+                  <div class="glass-panel" style="height: 100%;">
+                    <div class="chart-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+                      <h3>⏱️ Nhật ký mới</h3>
+                      <button class="btn-text-v2" onclick="document.querySelector('[data-admin-tab=\'logs\']').click()">Tất cả <i class="fas fa-chevron-right"></i></button>
+                    </div>
+                    <div class="realtime-logs" id="admin-mini-logs" style="max-height: 300px; overflow-y: auto;">
+                      <div style="text-align:center;padding:2rem;color:var(--admin-text-muted);">Đang tải...</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="overview-right">
+                  <div class="glass-panel chart-box">
+                    <div class="chart-header" style="margin-bottom:1rem"><h3>📈 Tương tác hệ thống</h3></div>
+                    <div class="chart-container" style="height: 250px;"><canvas id="activityChart"></canvas></div>
+                  </div>
+                </div>
+              </div>
+              
+              <!-- Geographic Pulse / Key Regions -->
+              <div class="glass-panel" style="margin: 1.5rem 0; box-shadow: 0 12px 40px rgba(0,0,0,0.3);">
+                <div class="chart-box__header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem">
+                  <h3 style="margin:0; font-size:1.1rem; font-weight:700; color:var(--admin-text)">📍 VÙNG DU LỊCH TRỌNG ĐIỂM</h3>
+                  <span class="badge-ai" style="background:rgba(16, 185, 129, 0.1); color:#10b981; border:1px solid rgba(16,185,129,0.2); padding:4px 10px; border-radius:20px; font-size:0.65rem; font-weight:800;">LIVE PULSE</span>
+                </div>
+                <div id="geo-pulse-list" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem;">
+                  <!-- Miền Bắc -->
+                  <div class="geo-item">
+                    <div class="geo-item-header">
+                      <span>Miền Bắc (Hà Nội, Sa Pa...)</span>
+                      <span class="geo-val">42%</span>
+                    </div>
+                    <div class="geo-progress-bg">
+                      <div class="geo-progress-bar bar--blue" style="width: 42%;"></div>
+                    </div>
+                  </div>
+                  <!-- Miền Trung -->
+                  <div class="geo-item">
+                    <div class="geo-item-header">
+                      <span>Miền Trung (Đà Nẵng, Hội An...)</span>
+                      <span class="geo-val val--yellow">35%</span>
+                    </div>
+                    <div class="geo-progress-bg">
+                      <div class="geo-progress-bar bar--yellow" style="width: 35%;"></div>
+                    </div>
+                  </div>
+                  <!-- Miền Nam -->
+                  <div class="geo-item">
+                    <div class="geo-item-header">
+                      <span>Miền Nam (TP.HCM, Phú Quốc...)</span>
+                      <span class="geo-val val--green">23%</span>
+                    </div>
+                    <div class="geo-progress-bg">
+                      <div class="geo-progress-bar bar--green" style="width: 23%;"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Leaderboards Section -->
+              <div class="leaderboard-section-header">
+                <h2 class="section-title">Bảng Xếp Hạng Hệ Thống</h2>
+                <div class="period-filter">
+                  <button class="btn-period is-active" data-period="today">Hôm nay</button>
+                  <button class="btn-period" data-period="alltime">Tất cả</button>
+                </div>
+              </div>
+
+              <div class="overview-grid grid-4">
+                <div class="glass-panel">
+                  <div class="chart-header" style="margin-bottom:1rem"><h3>⏳ Top Hoạt động</h3></div>
+                  <div class="leaderboard-list" id="rank-active-list"></div>
+                  <div class="view-more-container" style="margin-top:1rem; text-align:right;">
+                    <button class="btn-view-more" data-type="active" style="background:transparent; border:none; color:var(--admin-primary); cursor:pointer; font-size:0.85rem;">Xem thêm <i class="fas fa-chevron-right"></i></button>
+                  </div>
+                </div>
+
+                <div class="glass-panel">
+                  <div class="chart-header" style="margin-bottom:1rem"><h3>📅 Top Lịch trình</h3></div>
+                  <div class="leaderboard-list" id="rank-experience-list"></div>
+                  <div class="view-more-container" style="margin-top:1rem; text-align:right;">
+                    <button class="btn-view-more" data-type="itineraries" style="background:transparent; border:none; color:var(--admin-primary); cursor:pointer; font-size:0.85rem;">Xem thêm <i class="fas fa-chevron-right"></i></button>
+                  </div>
+                </div>
+
+                <div class="glass-panel">
+                  <div class="chart-header" style="margin-bottom:1rem"><h3>🏨 Top Doanh nghiệp</h3></div>
+                  <div class="leaderboard-list" id="rank-businesses-list"></div>
+                  <div class="view-more-container" style="margin-top:1rem; text-align:right;">
+                    <button class="btn-view-more" data-type="businesses" style="background:transparent; border:none; color:var(--admin-primary); cursor:pointer; font-size:0.85rem;">Xem thêm <i class="fas fa-chevron-right"></i></button>
+                  </div>
+                </div>
+
+                <div class="glass-panel">
+                  <div class="chart-header" style="margin-bottom:1rem"><h3>📍 Top Địa điểm</h3></div>
+                  <div class="leaderboard-list" id="rank-places-list"></div>
+                  <div class="view-more-container" style="margin-top:1rem; text-align:right;">
+                    <button class="btn-view-more" data-type="places" style="background:transparent; border:none; color:var(--admin-primary); cursor:pointer; font-size:0.85rem;">Xem thêm <i class="fas fa-chevron-right"></i></button>
+                  </div>
+                </div>
+              </div>
+            </div><!-- /overview-shell -->
+
+            <!-- Live Command Activity Stream (High-Tech Ticker) -->
+            <div class="glass-panel activity-stream-container">
+              <div style="display:flex; align-items:center; gap:1rem;">
+                <div class="stream-label">
+                  <span class="pulse-dot"></span>
+                  LIVE_ACTIVITY_STREAM
+                </div>
+                <div id="live-activity-stream" class="activity-stream-inner">
+                  <span class="stream-placeholder">Initializing secure connection to global activity stream...</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- System Health Row (Restored) -->
+            <div class="overview-grid health-row-grid">
+              <div class="glass-panel health-row">
+                <div class="health-item">
+                  <span class="health-dot health-dot--live"></span>
+                  <span>Hệ thống: <span id="health-status" class="health-val">Online</span></span>
+                </div>
+                <div class="health-item">Database: <span id="health-db" class="health-val">Connected</span></div>
+                <div class="health-item">Độ trễ API: <span id="health-latency" class="health-val val--blue">--ms</span></div>
+                <div class="health-item">Bộ nhớ: <span id="health-memory" class="health-val val--yellow">--MB</span></div>
+                <div class="health-item">Uptime: <span id="health-uptime" class="health-val">--s</span></div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Floating Ranking Popup (Reference Inspired) -->
+            <div class="slide-drawer" id="rankings-drawer" hidden onclick="if(event.target === this) closeRankingsDrawer()">
+              <div class="slide-drawer__inner">
+                <div class="slide-drawer__header">
+                  <h2 class="slide-drawer__title" id="drawer-rank-title">Bảng Xếp Hạng Chi Tiết</h2>
+                  <button class="slide-drawer__close-x" onclick="closeRankingsDrawer()">&times;</button>
+                </div>
+                <div class="slide-drawer__body">
+                  <div class="leaderboard-list leaderboard-list--full" id="drawer-rank-content">
+                    <!-- Cards will load here -->
+                  </div>
+                </div>
+                <div class="slide-drawer__footer">
+                  <button class="btn-popup-close" onclick="closeRankingsDrawer()">Đóng</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Backdrop (Lightweight) -->
+          
+          <!-- Moderation Panel -->
+          <section id="panel-moderation" class="admin-panel glass-panel" hidden>
+            <div class="admin-panel-header">
+              <h2 class="section-title">Hàng đợi Kiểm duyệt</h2>
+              <p class="section-desc">Các địa điểm/dịch vụ do doanh nghiệp mới đăng đang chờ phê duyệt.</p>
+            </div>
+
+            <!-- Dashboard Mini cho Duyệt Nội Dung -->
+            <div id="moderation-manager-dashboard" class="glass-panel-v2" style="margin-bottom: 1.5rem; padding: 1.5rem; display: none;">
+              <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <h3 style="margin:0; font-size: 1.1rem; color: var(--admin-primary);">🛡️ Tổng quan Duyệt Nội Dung</h3>
+                <span class="badge-ai" style="background:rgba(244, 63, 94, 0.1); color:#f43f5e; border:1px solid rgba(244,63,94,0.2); padding:4px 10px; border-radius:20px; font-size:0.65rem; font-weight:800;">PENDING ACTION</span>
+              </div>
+              <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 1.5rem;">
+                <div style="text-align:center; padding:1rem; background:rgba(0,0,0,0.2); border-radius:12px; border:1px solid rgba(255,255,255,0.05);">
+                  <div style="font-size:1.8rem; font-weight:800; color:#f59e0b" id="mm-pending">—</div>
+                  <div style="font-size:0.8rem; color:var(--admin-text-muted); margin-top:0.2rem;">Đang chờ duyệt</div>
+                </div>
+                <div style="text-align:center; padding:1rem; background:rgba(0,0,0,0.2); border-radius:12px; border:1px solid rgba(255,255,255,0.05);">
+                  <div style="font-size:1.8rem; font-weight:800; color:#10b981" id="mm-queue">READY</div>
+                  <div style="font-size:0.8rem; color:var(--admin-text-muted); margin-top:0.2rem;">Đã duyệt xong</div>
+                </div>
+                <div style="text-align:center; padding:1rem; background:rgba(0,0,0,0.2); border-radius:12px; border:1px solid rgba(255,255,255,0.05);">
+                  <div style="font-size:1.8rem; font-weight:800; color:#ef4444" id="mm-urgent">—</div>
+                  <div style="font-size:0.8rem; color:var(--admin-text-muted); margin-top:0.2rem;">Khẩn cấp</div>
+                </div>
+              </div>
+              <div style="height: 180px; position: relative;">
+                <canvas id="moderationManagerChart"></canvas>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th style="width:250px">Dịch vụ (Ảnh/Tên)</th>
+                    <th>Chủ sở hữu</th>
+                    <th>Ngày đăng</th>
+                    <th>Trạng thái</th>
+                    <th>Hành động</th>
+                  </tr>
+                </thead>
+                <tbody id="moderation-tbody">
+                  <tr><td colspan="5" class="table-loading">Đang tải hàng đợi...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <!-- Broadcast Panel -->
+          <section id="panel-broadcast" class="admin-panel glass-panel" hidden>
+            <div class="admin-panel-header">
+              <h2 class="section-title">Terminal Thông báo Hệ thống</h2>
+              <p class="section-desc">Gửi lệnh phát dữ liệu rảnh tay tới toàn mạng lưới WanderViệt.</p>
+            </div>
+            
+            <div class="command-center">
+              <div class="command-header">
+                <div class="cmd-dot cmd-dot--red"></div>
+                <div class="cmd-dot cmd-dot--yellow"></div>
+                <div class="cmd-dot cmd-dot--green"></div>
+                <span style="font-family: monospace; font-size: 0.75rem; color: #64748b; margin-left: 0.5rem;">wanderviet-cmd v1.0.4</span>
+              </div>
+              <div class="command-body">
+                <form id="broadcast-form">
+                  <div class="command-line">
+                    <span class="command-prompt">root@wander:~$</span>
+                    <span>select --recipient</span>
+                    <div class="command-input-wrap">
+                      <select name="recipientType" class="command-input" style="appearance: none;">
+                        <option value="ALL">ALL_USERS</option>
+                        <option value="BUSINESS">BUSINESS_PARTNERS</option>
+                        <option value="USER">TRAVELERS</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="command-line">
+                    <span class="command-prompt">root@wander:~$</span>
+                    <span>set --type</span>
+                    <div class="command-input-wrap">
+                      <select name="type" class="command-input" style="appearance: none;">
+                        <option value="broadcast">GENERIC_BROADCAST</option>
+                        <option value="info">INFO_ALERT</option>
+                        <option value="success">EVENT_REWARD</option>
+                        <option value="warning">SECURITY_MAINTENANCE</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="command-line">
+                    <span class="command-prompt">root@wander:~$</span>
+                    <span>echo --title</span>
+                    <div class="command-input-wrap">
+                      <input type="text" name="title" class="command-input" required placeholder='Enter title in "quotes"...' />
+                    </div>
+                  </div>
+                  <div class="command-line" style="align-items: flex-start;">
+                    <span class="command-prompt">root@wander:~$</span>
+                    <span>write --message</span>
+                    <div class="command-input-wrap">
+                      <textarea name="message" class="command-input" rows="3" required placeholder="Type your message system-wide..."></textarea>
+                    </div>
+                  </div>
+                  <div class="command-line">
+                    <span class="command-prompt">root@wander:~$</span>
+                    <span>attach --url</span>
+                    <div class="command-input-wrap">
+                      <input type="text" name="link" class="command-input" placeholder="Optional URL destination..." />
+                    </div>
+                  </div>
+                  
+                  <button type="submit" class="command-btn" id="btn-send-broadcast">
+                    <span>EXECUTE_COMMAND --push</span>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polyline points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                  </button>
+                </form>
+              </div>
+            </div>
+          </section>
+
+          <!-- Users Panel -->
+          <section id="panel-users" class="admin-panel glass-panel" hidden>
+            <div class="admin-panel-header">
+              <div style="flex:1">
+                <h2 class="section-title" style="font-size:1.4rem;margin:0">Danh sách Người dùng / Đối tác</h2>
+                <div class="bulk-actions" style="margin-top:0.5rem; display:flex; gap:0.5rem;">
+                   <button class="btn btn--small btn--ghost" onclick="WanderUI.exportToCSV('users')">📥 Xuất báo cáo CSV</button>
+                   <button class="btn btn--small btn--ghost" onclick="WanderToast.warn('Chức năng chọn nhiều đang được phát triển')">🔒 Khóa hàng loạt</button>
+                </div>
+              </div>
+              <input type="text" id="user-search" class="admin-search-input"
+                placeholder="🔍 Tìm theo email hoặc tên..." />
+            </div>
+
+            <!-- Dashboard Mini cho User Manager -->
+            <div id="user-manager-dashboard" class="glass-panel-v2" style="margin-bottom: 1.5rem; padding: 1.5rem; display: none;">
+              <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <h3 style="margin:0; font-size: 1.1rem; color: var(--admin-primary);">📊 Tổng quan Người dùng</h3>
+                <span class="badge-ai" style="background:rgba(56, 189, 248, 0.1); color:#38bdf8; border:1px solid rgba(56,189,248,0.2); padding:4px 10px; border-radius:20px; font-size:0.65rem; font-weight:800;">LIVE UPDATE</span>
+              </div>
+              <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1.5rem;">
+                <div style="text-align:center; padding:1rem; background:rgba(0,0,0,0.2); border-radius:12px; border:1px solid rgba(255,255,255,0.05);">
+                  <div style="font-size:1.8rem; font-weight:800; color:#38bdf8" id="um-total-users">—</div>
+                  <div style="font-size:0.8rem; color:var(--admin-text-muted); margin-top:0.2rem;">Tổng Thành Viên</div>
+                </div>
+                <div style="text-align:center; padding:1rem; background:rgba(0,0,0,0.2); border-radius:12px; border:1px solid rgba(255,255,255,0.05);">
+                  <div style="font-size:1.8rem; font-weight:800; color:#10b981" id="um-new-today">—</div>
+                  <div style="font-size:0.8rem; color:var(--admin-text-muted); margin-top:0.2rem;">Đăng ký hôm nay</div>
+                </div>
+                <div style="text-align:center; padding:1rem; background:rgba(0,0,0,0.2); border-radius:12px; border:1px solid rgba(255,255,255,0.05);">
+                  <div style="font-size:1.8rem; font-weight:800; color:#f59e0b" id="um-businesses">—</div>
+                  <div style="font-size:0.8rem; color:var(--admin-text-muted); margin-top:0.2rem;">Doanh nghiệp</div>
+                </div>
+                <div style="text-align:center; padding:1rem; background:rgba(0,0,0,0.2); border-radius:12px; border:1px solid rgba(255,255,255,0.05);">
+                  <div style="font-size:1.8rem; font-weight:800; color:#ef4444" id="um-suspended">—</div>
+                  <div style="font-size:0.8rem; color:var(--admin-text-muted); margin-top:0.2rem;">Bị khóa</div>
+                </div>
+              </div>
+              <div style="height: 220px; position: relative;">
+                <canvas id="userManagerChart"></canvas>
+              </div>
+            </div>
+            <!-- Filter Tabs -->
+            <div class="user-role-tabs" style="display:flex; gap:0.5rem; margin-bottom:1rem; flex-wrap:wrap;">
+              <button class="btn btn--small user-role-filter is-active" data-role="all">👥 Tất cả</button>
+              <button class="btn btn--small user-role-filter" data-role="user">🙋 Người dùng</button>
+              <button class="btn btn--small user-role-filter" data-role="admin">🛡️ Admin</button>
+              <button class="btn btn--small user-role-filter" data-role="superadmin">⭐ Super Admin</button>
+              <button class="btn btn--small user-role-filter" data-role="business">🏢 Doanh nghiệp</button>
+              <span id="user-count-label" style="margin-left:auto; font-size:0.82rem; color:var(--admin-text-muted); align-self:center;"></span>
+            </div>
+            <div class="table-wrap">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th>Avatar</th>
+                    <th>Tên / Email</th>
+                    <th>XP / Hạng</th>
+                    <th>Vai trò</th>
+                    <th>Ngày tham gia</th>
+                    <th>Hành động</th>
+                  </tr>
+                </thead>
+                <tbody id="users-tbody">
+                  <tr>
+                    <td colspan="6" style="text-align:center;padding:2rem">Đang tải...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+          
+          <!-- Places Panel -->
+          <section id="panel-places" class="admin-panel" hidden>
+            <div class="admin-panel-header">
+              <h2 class="section-title" style="font-size:1.4rem;margin:0">Điểm Du Lịch</h2>
+              <div style="display:flex;gap:0.75rem;align-items:center">
+                <button class="btn btn--ghost btn--small" onclick="WanderUI.exportToCSV('places')">📥 Xuất CSV</button>
+                <input type="text" id="place-search" class="admin-search-input" placeholder="🔍 Tìm điểm đến..." />
+                <button class="btn btn--primary btn--small" id="btn-add-place">+ Thêm mới</button>
+              </div>
+            </div>
+
+            <!-- Dashboard Mini cho Kho Địa Điểm -->
+            <div id="place-manager-dashboard" class="glass-panel-v2" style="margin-bottom: 1.5rem; padding: 1.5rem; display: none;">
+              <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <h3 style="margin:0; font-size: 1.1rem; color: var(--admin-primary);">🗺️ Tổng quan Kho Địa Điểm</h3>
+                <span class="badge-ai" style="background:rgba(16, 185, 129, 0.1); color:#10b981; border:1px solid rgba(16,185,129,0.2); padding:4px 10px; border-radius:20px; font-size:0.65rem; font-weight:800;">DATA READY</span>
+              </div>
+              <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1.5rem;">
+                <div style="text-align:center; padding:1rem; background:rgba(0,0,0,0.2); border-radius:12px; border:1px solid rgba(255,255,255,0.05);">
+                  <div style="font-size:1.8rem; font-weight:800; color:#10b981" id="pm-total-places">—</div>
+                  <div style="font-size:0.8rem; color:var(--admin-text-muted); margin-top:0.2rem;">Tổng Địa Điểm</div>
+                </div>
+                <div style="text-align:center; padding:1rem; background:rgba(0,0,0,0.2); border-radius:12px; border:1px solid rgba(255,255,255,0.05);">
+                  <div style="font-size:1.8rem; font-weight:800; color:#f59e0b" id="pm-top-places">—</div>
+                  <div style="font-size:0.8rem; color:var(--admin-text-muted); margin-top:0.2rem;">Địa điểm HOT</div>
+                </div>
+                <div style="text-align:center; padding:1rem; background:rgba(0,0,0,0.2); border-radius:12px; border:1px solid rgba(255,255,255,0.05);">
+                  <div style="font-size:1.8rem; font-weight:800; color:#38bdf8" id="pm-verified">—</div>
+                  <div style="font-size:0.8rem; color:var(--admin-text-muted); margin-top:0.2rem;">Đã kiểm chứng</div>
+                </div>
+                <div style="text-align:center; padding:1rem; background:rgba(0,0,0,0.2); border-radius:12px; border:1px solid rgba(255,255,255,0.05);">
+                  <div style="font-size:1.8rem; font-weight:800; color:#6366f1" id="pm-regions">—</div>
+                  <div style="font-size:0.8rem; color:var(--admin-text-muted); margin-top:0.2rem;">Vùng miền</div>
+                </div>
+              </div>
+              <div style="height: 200px; position: relative;">
+                <canvas id="placeManagerChart"></canvas>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th>Ảnh</th>
+                    <th>Tên điểm đến</th>
+                    <th>Vùng miền</th>
+                    <th>Ngân sách</th>
+                    <th>Tọa độ</th>
+                    <th>Hành động</th>
+                  </tr>
+                </thead>
+                <tbody id="places-tbody">
+                  <tr>
+                    <td colspan="6" style="text-align:center;padding:2rem">Đang tải...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <!-- Admin Management Panel -->
+          <section id="panel-admin-management" class="admin-panel glass-panel" hidden>
+            <div class="admin-panel-header">
+              <h2 class="section-title">Quản lý & Phân quyền Admin</h2>
+              <p class="section-desc">Tạo tài khoản quản trị viên cấp thấp và giới hạn quyền truy cập từng khu vực.</p>
+            </div>
+
+            <form id="w-admin-register-form" class="glass-panel" style="padding:2rem; display:grid; gap:1.5rem;">
+              <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:1.5rem;">
+                <label class="field">
+                  <span class="field-label">Tên hiển thị</span>
+                  <input type="text" name="name" required placeholder="Ví dụ: Admin Moderation" />
+                </label>
+                <label class="field">
+                  <span class="field-label">Email admin</span>
+                  <input type="email" name="email" required placeholder="new-admin@wanderviet.com" />
+                </label>
+                <label class="field">
+                  <span class="field-label">Mật khẩu</span>
+                  <input type="password" name="password" required minlength="8" placeholder="Tối thiểu 8 ký tự" />
+                </label>
+              </div>
+
+              <div>
+                <span class="field-label" style="display:block; margin-bottom:0.75rem;">Cấp quyền truy cập</span>
+                <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:1rem; background:rgba(0,0,0,0.2); padding:1.25rem; border-radius:12px; border:1px solid var(--admin-border);">
+                  <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer;">
+                    <input type="checkbox" name="permissions" value="overview" /> <span>Tổng quan</span>
+                  </label>
+                  <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer;">
+                    <input type="checkbox" name="permissions" value="moderation" /> <span>Duyệt nội dung</span>
+                  </label>
+                  <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer;">
+                    <input type="checkbox" name="permissions" value="users" /> <span>Quản lý người dùng</span>
+                  </label>
+                  <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer;">
+                    <input type="checkbox" name="permissions" value="broadcast" /> <span>Gửi thông báo</span>
+                  </label>
+                  <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer;">
+                    <input type="checkbox" name="permissions" value="logs" /> <span>Nhật ký hệ thống</span>
+                  </label>
+                  <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer;">
+                    <input type="checkbox" name="permissions" value="places" /> <span>Kho địa điểm</span>
+                  </label>
+                  <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer;">
+                    <input type="checkbox" name="permissions" value="knowledge" /> <span>Dữ liệu AI</span>
+                  </label>
+                  <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer;">
+                    <input type="checkbox" name="permissions" value="ai-intelligence" /> <span>Trí tuệ AI</span>
+                  </label>
+                  <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer;">
+                    <input type="checkbox" name="permissions" value="admin-management" /> <span>Quản lý Admin</span>
+                  </label>
+                </div>
+              </div>
+
+              <div style="text-align:right;">
+                <button type="button" class="btn btn--primary" id="w-btn-create-admin" style="min-width:180px; padding:0.75rem 2rem;">Tạo tài khoản Admin</button>
+              </div>
+            </form>
+            <p id="w-admin-create-status" style="margin-top:1rem; min-height:1.2rem; text-align:center; font-weight:600;"></p>
+          </section>
+
+          <!-- Feedbacks Panel -->
+          <section id="panel-feedbacks" class="admin-panel" hidden>
+            <div class="admin-panel-header">
+              <h2 class="section-title" style="font-size:1.4rem;margin:0">Danh sách Phản hồi</h2>
+              <input type="text" id="feedback-search" class="admin-search-input"
+                placeholder="🔍 Tìm theo nội dung, tên..." />
+            </div>
+            <div class="table-wrap">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th>Thời gian</th>
+                    <th>Người gửi</th>
+                    <th>Email</th>
+                    <th style="width: 45%;">Nội dung</th>
+                    <th>Hành động</th>
+                  </tr>
+                </thead>
+                <tbody id="feedbacks-tbody">
+                  <tr>
+                    <td colspan="5" style="text-align:center;padding:2rem">Đang tải...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <!-- Itineraries Panel -->
+          <section id="panel-itineraries" class="admin-panel" hidden>
+            <div class="admin-panel-header">
+              <h2 class="section-title" style="font-size:1.4rem;margin:0">Lịch trình AI đã tạo</h2>
+              <input type="text" id="itinerary-search" class="admin-search-input"
+                placeholder="🔍 Tìm theo điểm đến, ngân sách..." />
+            </div>
+            <div class="table-wrap">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th>Ngày tạo</th>
+                    <th>Điểm đến</th>
+                    <th>Số ngày</th>
+                    <th>Ngân sách</th>
+                    <th>Hành động</th>
+                  </tr>
+                </thead>
+                <tbody id="itineraries-tbody">
+                  <tr>
+                    <td colspan="5" style="text-align:center;padding:2rem">Đang tải...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <!-- Knowledge Panel -->
+          <section id="panel-knowledge" class="admin-panel glass-panel" hidden>
+            <div class="admin-panel-header">
+              <div style="flex:1">
+                <h2 class="section-title">Quản lý Tri thức AI (Smart Cache)</h2>
+                <p class="section-desc">Cung cấp các câu trả lời mẫu để Chatbot phản hồi tức thì mà không cần gọi Groq AI.</p>
+              </div>
+              <div style="display:flex; gap:0.75rem;">
+                <button class="btn btn--success btn--small" id="btn-seed-knowledge">♻️ Nạp dữ liệu mẫu</button>
+                <button class="btn btn--primary btn--small" id="btn-add-knowledge">+ Thêm câu hỏi</button>
+              </div>
+            </div>
+
+            <!-- Dashboard Mini cho AI Knowledge -->
+            <div id="knowledge-manager-dashboard" class="glass-panel-v2" style="margin-bottom: 1.5rem; padding: 1.5rem; display: none;">
+              <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <h3 style="margin:0; font-size: 1.1rem; color: var(--admin-primary);">🧠 Thống kê Dữ liệu AI</h3>
+              </div>
+              <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem;">
+                <div style="text-align:center; padding:1rem; background:rgba(0,0,0,0.2); border-radius:12px; border:1px solid rgba(255,255,255,0.05);">
+                  <div style="font-size:1.8rem; font-weight:800; color:#6366f1" id="km-total">—</div>
+                  <div style="font-size:0.8rem; color:var(--admin-text-muted); margin-top:0.2rem;">Tổng câu hỏi</div>
+                </div>
+                <div style="text-align:center; padding:1rem; background:rgba(0,0,0,0.2); border-radius:12px; border:1px solid rgba(255,255,255,0.05);">
+                  <div style="font-size:1.8rem; font-weight:800; color:#38bdf8" id="km-tags">—</div>
+                  <div style="font-size:0.8rem; color:var(--admin-text-muted); margin-top:0.2rem;">Từ khóa (Tags)</div>
+                </div>
+                <div style="text-align:center; padding:1rem; background:rgba(0,0,0,0.2); border-radius:12px; border:1px solid rgba(255,255,255,0.05);">
+                  <div style="font-size:1.8rem; font-weight:800; color:#10b981" id="km-recent">—</div>
+                  <div style="font-size:0.8rem; color:var(--admin-text-muted); margin-top:0.2rem;">Mới trong tuần</div>
+                </div>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th>Câu hỏi / Từ khóa</th>
+                    <th>Câu trả lời</th>
+                    <th>Tags</th>
+                    <th>Hành động</th>
+                  </tr>
+                </thead>
+                <tbody id="knowledge-tbody">
+                  <tr><td colspan="4" style="text-align:center">Đang tải dữ liệu tri thức...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <!-- ── AI Intelligence Panel ── -->
+          <section id="panel-ai-intelligence" class="admin-panel glass-panel" hidden>
+            <!-- Header -->
+            <div class="admin-panel-header">
+              <div style="flex:1">
+                <h2 class="section-title">⚡ WanderIntel — Phân tích Thời gian thực</h2>
+                <p class="section-desc">Dữ liệu từ MongoDB · Tự động làm mới mỗi 30 giây · <span id="intel-updated-at" style="color:var(--admin-primary)">Đang tải...</span></p>
+              </div>
+              <div class="ai-status-indicator">
+                <span class="pulse-dot"></span> LIVE
+              </div>
+            </div>
+
+            <!-- Stats Row -->
+            <div style="display:grid; grid-template-columns: repeat(4,1fr); gap:1rem; margin-top:1.5rem;">
+              <div class="glass-panel-v2" style="text-align:center; padding:1.2rem;">
+                <div style="font-size:2rem; font-weight:800; color:var(--admin-primary)" id="intel-total-itin">—</div>
+                <div style="font-size:0.8rem; color:var(--admin-text-muted); margin-top:0.2rem;">Tổng lịch trình</div>
+              </div>
+              <div class="glass-panel-v2" style="text-align:center; padding:1.2rem;">
+                <div style="font-size:2rem; font-weight:800; color:#6366f1" id="intel-real-users">—</div>
+                <div style="font-size:0.8rem; color:var(--admin-text-muted); margin-top:0.2rem;">Người dùng thật</div>
+              </div>
+              <div class="glass-panel-v2" style="text-align:center; padding:1.2rem;">
+                <div style="font-size:2rem; font-weight:800; color:#10b981" id="intel-sentiment">—%</div>
+                <div style="font-size:0.8rem; color:var(--admin-text-muted); margin-top:0.2rem;">Mức độ hài lòng</div>
+              </div>
+              <div class="glass-panel-v2" style="text-align:center; padding:1.2rem;">
+                <div style="font-size:1.1rem; font-weight:800; color:#f59e0b" id="intel-top-dest">—</div>
+                <div style="font-size:0.8rem; color:var(--admin-text-muted); margin-top:0.2rem;">Điểm đến #1 tuần này</div>
+              </div>
+            </div>
+
+            <!-- Main Chart -->
+            <div class="glass-panel-v2" style="margin-top:1.2rem; padding:1.5rem;">
+              <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:1rem;">
+                <h3 style="margin:0; font-size:1rem; color:var(--admin-text);">📈 Xu hướng lịch trình 7 ngày gần nhất</h3>
+                <div style="display:flex; gap:0.5rem;">
+                  <button class="btn btn--small btn--ghost is-active" id="intel-chart-mode-daily" onclick="switchIntelChart('daily')">Theo ngày</button>
+                  <button class="btn btn--small btn--ghost" id="intel-chart-mode-dest" onclick="switchIntelChart('dest')">Theo điểm đến</button>
+                </div>
+              </div>
+              <div style="height:280px; position:relative;">
+                <canvas id="aiTrendChart"></canvas>
+              </div>
+            </div>
+
+            <!-- Bottom: Top Destinations + Activity Log -->
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:1.2rem; margin-top:1.2rem;">
+              <!-- Top Destinations -->
+              <div class="glass-panel-v2">
+                <h3 style="margin:0 0 1rem; font-size:0.95rem; color:var(--admin-text);">🗺️ Top điểm đến tuần này</h3>
+                <div id="intel-top-list" style="display:flex; flex-direction:column; gap:0.6rem;">
+                  <div style="color:var(--admin-text-muted); font-size:0.85rem;">Đang tải...</div>
+                </div>
+              </div>
+              <!-- Recent Activity -->
+              <div class="glass-panel-v2">
+                <h3 style="margin:0 0 1rem; font-size:0.95rem; color:var(--admin-text);">🕐 Hoạt động gần đây</h3>
+                <div id="intel-recent-logs" style="display:flex; flex-direction:column; gap:0.6rem;">
+                  <div style="color:var(--admin-text-muted); font-size:0.85rem;">Đang tải...</div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Lịch sử hoạt động Panel -->
+          <section id="panel-logs" class="admin-panel glass-panel" hidden>
+            <div class="admin-panel-header">
+              <h2 class="section-title" style="font-size:1.4rem;margin:0">Lịch sử hệ thống</h2>
+              <div class="filter-bar">
+                <button class="btn btn--small btn--ghost" data-log-filter="all">Tất cả</button>
+                <button class="btn btn--small btn--ghost" data-log-filter="user">Người dùng</button>
+                <button class="btn btn--small btn--ghost" data-log-filter="business">Doanh nghiệp</button>
+                <button class="btn btn--small btn--ghost" data-log-filter="admin">Admin</button>
+              </div>
+            </div>
+
+            <!-- Dashboard Mini cho Nhật Ký -->
+            <div id="log-manager-dashboard" class="glass-panel-v2" style="margin-bottom: 1.5rem; padding: 1.5rem; display: none;">
+              <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <h3 style="margin:0; font-size: 1.1rem; color: var(--admin-primary);">📜 Phân tích Nhật Ký Hệ Thống</h3>
+              </div>
+              <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1.5rem;">
+                <div style="text-align:center; padding:1rem; background:rgba(0,0,0,0.2); border-radius:12px; border:1px solid rgba(255,255,255,0.05);">
+                  <div style="font-size:1.8rem; font-weight:800; color:#38bdf8" id="lm-total">—</div>
+                  <div style="font-size:0.8rem; color:var(--admin-text-muted); margin-top:0.2rem;">Tổng Log</div>
+                </div>
+                <div style="text-align:center; padding:1rem; background:rgba(0,0,0,0.2); border-radius:12px; border:1px solid rgba(255,255,255,0.05);">
+                  <div style="font-size:1.8rem; font-weight:800; color:#6366f1" id="lm-today">—</div>
+                  <div style="font-size:0.8rem; color:var(--admin-text-muted); margin-top:0.2rem;">Hôm nay</div>
+                </div>
+                <div style="text-align:center; padding:1rem; background:rgba(0,0,0,0.2); border-radius:12px; border:1px solid rgba(255,255,255,0.05);">
+                  <div style="font-size:1.8rem; font-weight:800; color:#f59e0b" id="lm-admin">—</div>
+                  <div style="font-size:0.8rem; color:var(--admin-text-muted); margin-top:0.2rem;">Hành động Admin</div>
+                </div>
+                <div style="text-align:center; padding:1rem; background:rgba(0,0,0,0.2); border-radius:12px; border:1px solid rgba(255,255,255,0.05);">
+                  <div style="font-size:1.8rem; font-weight:800; color:#10b981" id="lm-system">—</div>
+                  <div style="font-size:0.8rem; color:var(--admin-text-muted); margin-top:0.2rem;">Hệ thống</div>
+                </div>
+              </div>
+              <div style="height: 180px; position: relative;">
+                <canvas id="logManagerChart"></canvas>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th>Thời gian</th>
+                    <th>User</th>
+                    <th>Hành động</th>
+                    <th>Chi tiết</th>
+                  </tr>
+                </thead>
+                <tbody id="logs-tbody">
+                  <tr>
+                    <td colspan="4" style="text-align:center;padding:2rem">Đang tải lịch sử...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+        </div> <!-- End admin-content -->
+      </div> <!-- End admin-main-content -->
+    </div> <!-- End admin-layout -->
+  </main>
+
+  <button id="theme-toggle" class="theme-toggle-btn">🌓</button>
+
+  <!-- Toast Container -->
+  <div id="toast-container"></div>
+
+
+
+  <!-- Backdrop for Drawers -->
+  <div class="modal-backdrop" id="admin-modal-backdrop" hidden></div>
+
+  <!-- Notification Drawer -->
+  <div id="drawer-notifications" class="slide-drawer" hidden>
+    <div class="slide-drawer__inner">
+      <div class="slide-drawer__header">
+        <h3 class="slide-drawer__title">Thông báo hệ thống</h3>
+        <button type="button" class="slide-drawer__close" onclick="WanderUI.toggleNotificationDrawer()">&times;</button>
+      </div>
+      <div class="slide-drawer__body" id="notif-list">
+        <!-- Thông báo sẽ load ở đây -->
+      </div>
+    </div>
+  </div>
+
+  <!-- User Edit Drawer (Off-canvas) -->
+  <div class="slide-drawer" id="modal-user-form" hidden>
+    <div class="slide-drawer__inner">
+      <div class="slide-drawer__header">
+        <h2 class="slide-drawer__title" id="user-modal-title">Chỉnh sửa Người dùng</h2>
+        <button type="button" class="slide-drawer__close" data-close-modal aria-label="Đóng">×</button>
+      </div>
+      <div class="slide-drawer__body">
+        <form id="user-form">
+          <input type="hidden" name="id" id="user-edit-id" />
+          <div class="admin-form-grid">
+            <label class="field"><span class="field-label">Họ tên</span><input type="text" name="name" /></label>
+            <label class="field"><span class="field-label">Tên hiển thị</span><input type="text"
+                name="displayName" /></label>
+            <label class="field"><span class="field-label">Email</span><input type="email" name="email" /></label>
+            <label class="field"><span class="field-label">Số điện thoại</span><input type="tel" name="phone" /></label>
+            <label class="field"><span class="field-label">XP (Điểm tích lũy)</span><input type="number" name="points" /></label>
+            <label class="field field--full"><span class="field-label">Link Ảnh đại diện (URL)</span><input type="url"
+                name="avatar" placeholder="https://..." /></label>
+            <label class="field field--full"><span class="field-label">Ghi chú</span><textarea name="notes"
+                rows="2"></textarea></label>
+            <label class="field field--full" style="display:flex;align-items:center;gap:0.75rem;padding:0.5rem 0">
+              <input type="checkbox" name="isAdmin" id="chk-is-admin" style="width:20px;height:20px" />
+              <span class="field-label" style="margin:0">Cấp quyền Admin</span>
+            </label>
+          </div>
+          <div style="display:flex;gap:0.75rem;margin-top:1rem">
+            <button type="submit" class="btn btn--primary" style="flex:1">💾 Lưu thay đổi</button>
+          </div>
+          <p id="user-form-status" style="margin-top:0.75rem;font-size:0.9rem;min-height:1.25rem"></p>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Admin Profile Edit Drawer (New) -->
+  <div class="slide-drawer" id="modal-profile-edit" hidden>
+    <div class="slide-drawer__inner">
+      <div class="slide-drawer__header">
+        <h2 class="slide-drawer__title">Chỉnh sửa Hồ sơ Quản trị</h2>
+        <button type="button" class="slide-drawer__close" data-close-modal aria-label="Đóng">×</button>
+      </div>
+      <div class="slide-drawer__body">
+        <form id="profile-edit-form">
+          <div class="admin-form-grid">
+            <label class="field field--full">
+              <span class="field-label">Tên hiển thị</span>
+              <input type="text" name="displayName" required />
+            </label>
+            <div class="field field--full">
+              <span class="field-label">Ảnh đại diện Quản trị</span>
+              <div class="upload-dropzone" id="profile-dropzone" style="padding: 0.75rem; display: flex; align-items: center; justify-content: center; gap: 1rem; min-height: 60px;">
+                <input type="file" id="profile-image-input" name="avatarFile" accept="image/jpeg, image/png, image/webp" class="visually-hidden" />
+                <label for="profile-image-input" class="upload-dropzone__label" style="flex-direction: row; text-align: left; gap: 0.75rem;">
+                  <span style="font-size: 1.5rem; margin-bottom: 0;">👤</span>
+                  <p style="margin:0;">Kéo thả hoặc <strong>nhấp chọn ảnh mới</strong></p>
+                </label>
+                <div class="upload-preview-list" id="profile-dropzone-preview" style="margin-top: 0;"></div>
+              </div>
+              <input type="hidden" name="avatar" id="hidden-profile-avatar" />
+            </div>
+            <label class="field field--full">
+              <span class="field-label">Email</span>
+              <input type="email" name="email" readonly style="opacity:0.6; cursor:not-allowed" />
+              <small style="color:var(--admin-text-muted)">Email đăng nhập không thể thay đổi.</small>
+            </label>
+          </div>
+          <div style="display:flex;gap:0.75rem;margin-top:2rem">
+            <button type="submit" class="btn btn--primary" style="flex:1">💾 Lưu hồ sơ</button>
+          </div>
+          <p id="profile-edit-status" style="margin-top:1rem; font-size:0.9rem; text-align:center"></p>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Place Edit Drawer (Off-canvas) -->
+  <div class="slide-drawer" id="modal-place-form" hidden>
+    <div class="slide-drawer__inner slide-drawer__inner--wide">
+      <div class="slide-drawer__header">
+        <h2 class="slide-drawer__title" id="place-modal-title">Thêm / Sửa Điểm Đến</h2>
+        <button type="button" class="slide-drawer__close" data-close-modal aria-label="Đóng">×</button>
+      </div>
+      <div class="slide-drawer__body">
+        <form id="place-form">
+          <input type="hidden" name="id" id="place-edit-id" />
+          <div class="admin-form-grid">
+            <label class="field"><span class="field-label">Tên địa điểm (*)</span><input type="text" name="name"
+                required /></label>
+            <label class="field"><span class="field-label">Loại (Kind)</span>
+              <select name="kind">
+                <option value="diem-du-lich" selected>Điểm du lịch</option>
+                <option value="tien-ich">Tiện ích</option>
+              </select>
+            </label>
+            <label class="field"><span class="field-label">Vùng miền</span><input type="text" name="region" /></label>
+            <label class="field"><span class="field-label">Phân loại (Category)</span><input type="text" name="category" placeholder="ví dụ: Di sản, Ẩm thực..." /></label>
+            <label class="field field--full"><span class="field-label">Đối tác sở hữu (Owner ID)</span><input type="text" name="ownerId" readonly style="opacity:0.7; cursor:not-allowed; background:rgba(255,255,255,0.05)" placeholder="Dữ liệu hệ thống hoặc ID doanh nghiệp" /></label>
+            <div class="field field--full">
+              <span class="field-label">Hình ảnh điểm đến (*)</span>
+              <!-- Hidden input to hold absolute array of URL images if we modify order -->
+              <input type="hidden" name="images" id="hidden-place-images" />
+              <div class="upload-dropzone" id="place-dropzone">
+                <input type="file" id="place-image-input" name="imageFile" accept="image/jpeg, image/png, image/webp" multiple class="visually-hidden" />
+                <label for="place-image-input" class="upload-dropzone__label">
+                  <span style="font-size: 2rem; display:block; margin-bottom:0.5rem;">📸</span>
+                  <p style="margin:0 0 0.25rem 0;">Kéo thả ảnh vào đây hoặc <strong>nhấp để chọn</strong></p>
+                  <p style="margin:0; font-size: 0.8rem; color: var(--text-muted);">(Tối đa 5MB/ảnh, hỗ trợ JPG, PNG, WEBP)</p>
+                </label>
+                <div class="upload-preview-list" id="place-dropzone-preview" style="display:flex; flex-wrap:wrap; gap:0.5rem; margin-top:1rem;"></div>
+              </div>
+            </div>
+            <label class="field"><span class="field-label">Ngân sách</span>
+              <select name="budget">
+                <option value="1">1 - Tiết kiệm</option>
+                <option value="2" selected>2 - Vừa phải</option>
+                <option value="3">3 - Cao cấp</option>
+              </select>
+            </label>
+            <label class="field"><span class="field-label">Nhịp chuyến</span>
+              <select name="pace">
+                <option value="cham">Thong thả</option>
+                <option value="vua" selected>Cân bằng</option>
+                <option value="nhanh">Năng động</option>
+              </select>
+            </label>
+            <label class="field"><span class="field-label">Vĩ độ (lat)</span><input type="number" name="lat" step="any"
+                placeholder="ví dụ: 10.2899" /></label>
+            <label class="field"><span class="field-label">Kinh độ (lng)</span><input type="number" name="lng"
+                step="any" placeholder="ví dụ: 103.984" /></label>
+            <label class="field field--full"><span class="field-label">Tags (cách nhau bằng dấu phẩy)</span><input
+                type="text" name="tags" placeholder="ví dụ: biển, ẩm thực" /></label>
+            <label class="field"><span class="field-label">Mô tả ngắn (1-2 câu)</span><textarea name="description"
+                rows="2"></textarea></label>
+            <label class="field field--full"><span class="field-label">Nội dung chi tiết (Legacy Text)</span><textarea name="text"
+                rows="2"></textarea></label>
+            <label class="field field--full"><span class="field-label">Gợi ý di chuyển</span><textarea name="transportTips"
+                rows="2"></textarea></label>
+
+            <!-- Rich Narrative Content -->
+            <fieldset class="field field--full" style="border:1px solid var(--border); padding:1rem; border-radius:var(--radius-sm); margin-top:0.5rem;">
+              <legend class="field-label" style="padding:0 0.5rem;">✨ Nội dung cao cấp (Business Content)</legend>
+              <div class="admin-form-grid">
+                <label class="field field--full"><span class="field-label">Bản sắc & Câu chuyện (Overview)</span><textarea name="overview" rows="3" placeholder="Giới thiệu sâu sắc về địa điểm..."></textarea></label>
+                <label class="field field--full"><span class="field-label">Gợi ý trải nghiệm (Experience)</span><textarea name="experience" rows="2" placeholder="Khuyên khách hàng nên làm gì..."></textarea></label>
+                <label class="field"><span class="field-label">Điểm nhấn (cách nhau dấu phẩy)</span><input type="text" name="highlights" placeholder="Gần biển, Buffet sáng..." /></label>
+                <label class="field"><span class="field-label">Màu chủ đề (Theme Color)</span><input type="color" name="themeColor" value="#3b82f6" style="height:42px" /></label>
+              </div>
+            </fieldset>
+            
+            <!-- Nested Data Fields -->
+            <fieldset class="field field--full" style="border:1px solid var(--border); padding:1rem; border-radius:var(--radius-sm); margin-top:0.5rem;">
+              <legend class="field-label" style="padding:0 0.5rem;">📌 Dữ liệu liên kết (JSON Array)</legend>
+              <div class="admin-form-grid">
+                <label class="field field--full"><span class="field-label">Địa điểm vui chơi (amusementPlaces)</span><textarea name="amusementPlaces" rows="2" placeholder='[{"name":"...","image":"...","ticketPrice":"..."}]' style="font-family:monospace"></textarea></label>
+                <label class="field field--full"><span class="field-label">Nơi lưu trú (accommodations)</span><textarea name="accommodations" rows="2" placeholder='[{"name":"...","image":"...","priceRange":"..."}]' style="font-family:monospace"></textarea></label>
+                <label class="field field--full"><span class="field-label">Nhà hàng / Quán ăn (diningPlaces)</span><textarea name="diningPlaces" rows="2" placeholder='[{"name":"...","image":"...","priceRange":"..."}]' style="font-family:monospace"></textarea></label>
+                <label class="field field--full"><span class="field-label">Điểm Check-in (checkInSpots)</span><textarea name="checkInSpots" rows="2" placeholder='[{"name":"...","image":"...","address":"..."}]' style="font-family:monospace"></textarea></label>
+              </div>
+            </fieldset>
+
+            <!-- Pricing & Hours -->
+            <fieldset class="field field--full" style="border:1px solid var(--border); padding:1rem; border-radius:var(--radius-sm); margin-top:0.5rem;">
+              <legend class="field-label" style="padding:0 0.5rem;">💰 Giá & Thời gian</legend>
+              <div class="admin-form-grid" style="grid-template-columns: 1fr 1fr 1fr 1fr;">
+                <label class="field"><span class="field-label">Giá từ</span><input type="number" name="priceFrom" /></label>
+                <label class="field"><span class="field-label">Giá đến</span><input type="number" name="priceTo" /></label>
+                <label class="field"><span class="field-label">Giờ mở cửa</span><input type="time" name="openTime" /></label>
+                <label class="field"><span class="field-label">Giờ đóng cửa</span><input type="time" name="closeTime" /></label>
+              </div>
+            </fieldset>
+            
+            <fieldset class="field field--full" style="border:1px solid var(--border); padding:1rem; border-radius:var(--radius-sm); margin-top:0.5rem;">
+              <legend class="field-label" style="padding:0 0.5rem;">Chứng thực dữ liệu</legend>
+              <div style="display:flex; gap:1rem; flex-direction:column;">
+                <label style="display:flex; align-items:center; gap:0.5rem;">
+                  <input type="checkbox" name="verified" id="chk-verified" style="width:20px;height:20px;accent-color:var(--success)" />
+                  <strong>Dữ liệu này đã được kiểm chứng & theo nguồn thực tế</strong>
+                </label>
+                <div style="display:flex; gap:1rem; width:100%;">
+                  <label class="field" style="flex:1"><span class="field-label">Tên Nguồn/Tổ chức</span><input type="text" name="sourceName" placeholder="Ví dụ: VQG Côn Đảo" /></label>
+                  <label class="field" style="flex:1"><span class="field-label">Link Tham chiếu</span><input type="url" name="sourceUrl" placeholder="https://..." /></label>
+                </div>
+              </div>
+            </fieldset>
+
+            <label class="field field--full" style="display:flex;align-items:center;gap:0.75rem;padding:0.5rem 0">
+              <input type="checkbox" name="top" id="chk-top" style="width:20px;height:20px" />
+              <span class="field-label" style="margin:0">Đánh dấu là điểm "Top"</span>
+            </label>
+          </div>
+          <div style="display:flex;gap:0.75rem;margin-top:1rem">
+            <button type="submit" class="btn btn--primary" style="flex:1">💾 Lưu Thông Tin</button>
+            <button type="button" class="btn btn--ghost" id="btn-delete-place" hidden
+              style="color:#f87171;border-color:rgba(248,113,113,0.4)">🗑️ Xóa điểm đến</button>
+          </div>
+          <p id="place-form-status" style="margin-top:0.75rem;font-size:0.9rem;min-height:1.25rem"></p>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- User Activity Drawer -->
+  <div id="user-activity-drawer" class="slide-drawer" hidden>
+    <div class="slide-drawer__inner slide-drawer__inner--wide">
+      <div class="slide-drawer__header">
+        <h2 style="display:flex; align-items:center; gap:0.75rem;">📜 Lịch sử hoạt động</h2>
+        <button class="slide-drawer__close" onclick="WanderUI.closeDrawer('user-activity-drawer')">&times;</button>
+      </div>
+      <div class="slide-drawer__body" style="padding: 1.5rem;">
+        <div id="user-activity-info" style="margin-bottom: 2rem; padding: 1.5rem; background: rgba(255,255,255,0.03); border-radius: 12px; border: 1px solid rgba(255,255,255,0.05);">
+          <div style="display:flex; align-items:center; gap:1.5rem;">
+            <img id="ua-avatar" src="" style="width:70px; height:70px; border-radius:50%; border:2px solid var(--admin-primary); object-fit:cover;" />
+            <div>
+              <h3 id="ua-name" style="margin:0; font-size:1.2rem;">...</h3>
+              <p id="ua-email" style="color:var(--admin-text-muted); margin:0.2rem 0; font-size:0.9rem;">...</p>
+              <div id="ua-badges" style="display:flex; gap:0.5rem; margin-top:0.5rem;"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="activity-timeline-container" style="max-height: 60vh; overflow-y: auto; padding-right: 1rem;">
+          <div class="activity-timeline" id="ua-timeline">
+            <!-- Items injected here -->
+            <div class="table-loading">Đang tải lịch sử...</div>
+          </div>
+        </div>
+        
+        <div style="margin-top: 2rem; text-align: center;">
+          <button class="btn btn--ghost btn-popup-close" style="width: 100%;" onclick="WanderUI.closeDrawer('user-activity-drawer')">Đóng cửa sổ</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Global Search Overlay -->
+  <div id="w-global-search-modal" class="search-overlay">
+    <div class="search-modal glass-panel">
+      <div class="search-header">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="w-search-input" placeholder="Tìm kiếm nhanh... (Ctrl + K)" autocomplete="off" />
+        <span class="search-esc">ESC</span>
+      </div>
+      <div class="search-results" id="w-search-results">
+        <div class="empty-state">
+          <p>Nhập từ khóa để tìm nhanh...</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js?v=202604231817" crossorigin=""></script>
+  <script src="admin.js?v=202604240718"></script>
+</body>
+
+</html>
