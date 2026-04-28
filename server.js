@@ -5,7 +5,6 @@ const cors = require('cors');
 const compression = require('compression');
 const path = require('path');
 const http = require('http');
-const compression = require('compression');
 const { initBroadcastWorker } = require('./utils/broadcastWorker');
 
 // Clean up environment variables (remove spaces/newlines)
