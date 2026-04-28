@@ -136,25 +136,55 @@
               </select>
             </div>
 
+            <div class="planner-form-group">
+              <label class="planner-form-label" for="companion">👥 Bạn đi cùng ai?</label>
+              <select id="companion" name="companion" class="planner-input">
+                <option value="Một mình">Một mình (Solo)</option>
+                <option value="Cặp đôi">Cặp đôi / Người yêu</option>
+                <option value="Gia đình">Gia đình (Có người già/trẻ em)</option>
+                <option value="Bạn bè" selected>Nhóm bạn thân</option>
+                <option value="Đồng nghiệp">Đồng nghiệp / Công ty</option>
+              </select>
+            </div>
+
+            <div class="planner-form-group">
+              <label class="planner-form-label" for="objective">🎯 Mục tiêu chính?</label>
+              <select id="objective" name="objective" class="planner-input">
+                <option value="Nghỉ dưỡng">Nghỉ dưỡng & Thư giãn</option>
+                <option value="Khám phá">Khám phá & Trải nghiệm</option>
+                <option value="Chụp ảnh">Chụp ảnh / Sống ảo</option>
+                <option value="Ẩm thực" selected>Thưởng thức ẩm thực</option>
+                <option value="Lễ hội">Tham gia lễ hội / Sự kiện</option>
+              </select>
+            </div>
+
             <button type="submit" class="planner-btn" id="generateBtn">
               💬 Tiếp tục — AI sẽ hỏi thêm
             </button>
           </form>
         </div>
 
-        <!-- BƯỚC 2: Chat hỏi đáp với AI -->
-        <div id="stepChat" style="display:none;">
-          <div id="chatMessages" class="planner-chat-messages"></div>
-          <form id="chatAnswerForm" class="planner-chat-input-row" style="display:none;">
-            <input type="text" id="chatAnswerInput" class="planner-input" placeholder="Nhập câu trả lời..." autocomplete="off">
-            <button type="submit" class="planner-btn" style="width:auto; padding: 0.7rem 1.2rem; white-space:nowrap;">Gửi →</button>
-          </form>
-          <!-- Quick choice chips -->
-          <div id="chatChips" class="planner-chat-chips"></div>
-          <button id="btnConfirmGenerate" class="planner-btn" style="display:none; margin-top:1rem; background: linear-gradient(135deg, #7c3aed, #4f46e5);">
-            🚀 Tạo lịch trình ngay!
-          </button>
-          <button id="btnBackToStep1" type="button" style="margin-top:0.75rem; background:none; border:none; color:var(--text-muted); font-size:0.85rem; cursor:pointer; text-decoration:underline;">← Nhập lại thông tin cơ bản</button>
+        <!-- BƯỚC 2: TRỢ LÝ THÔNG MINH (Smart Wizard) -->
+        <div id="stepSmartWizard" style="display:none;">
+          <div id="smartChatArea" class="planner-chat-messages"></div>
+          
+          <div id="smartOptionsArea" class="smart-wizard-group">
+            <!-- Chips/Grouped selections go here -->
+          </div>
+
+          <div id="smartInputArea" class="planner-chat-input-row">
+            <form id="smartChatForm" style="display:flex; width:100%; gap:0.5rem;">
+              <input type="text" id="smartChatInput" class="planner-input" placeholder="Nhập câu trả lời hoặc chọn phía trên..." autocomplete="off">
+              <button type="submit" class="planner-btn" style="width:auto; padding: 0.75rem 1.25rem;">Gửi →</button>
+            </form>
+          </div>
+
+          <div id="smartConfirmationArea" style="display:none; text-align:center; margin-top:1.5rem;">
+            <div id="detectedDataSummary" style="background: var(--bg-card); padding:1.25rem; border-radius:1rem; margin-bottom:1.5rem; text-align:left; border:1px solid var(--border);"></div>
+            <button id="btnFinalGenerate" class="planner-btn" style="background: linear-gradient(135deg, #7c3aed, #4f46e5);">
+              🚀 Lên lịch trình ngay!
+            </button>
+          </div>
         </div>
 
         <!-- BƯỚC KHÁM PHÁ: AI gợi ý điểm đến -->

@@ -501,3 +501,103 @@ a {
   color: var(--accent, #10b981);
   transform: translateY(-1px);
 }
+
+.chat-chip.is-selected {
+  background: var(--accent, #10b981) !important;
+  color: #fff !important;
+  border-color: var(--accent, #10b981) !important;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+  font-weight: 600;
+}
+
+.chat-chip:active {
+  transform: scale(0.95);
+}
+
+/* Smart Wizard Styles */
+.smart-wizard-group {
+  margin-bottom: 1.5rem;
+  animation: slideUp 0.3s ease-out;
+}
+
+.smart-chat-options-wrapper {
+  background: rgba(255, 255, 255, 0.03);
+  padding: 1rem;
+  border-radius: 1rem;
+  border: 1px solid var(--border);
+}
+
+.chat-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.chat-icon {
+  font-size: 1rem;
+}
+
+.chat-name {
+  font-weight: 800;
+  font-size: 0.7rem;
+  color: var(--accent, #10b981);
+  letter-spacing: 1px;
+}
+
+.back-link {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  text-decoration: underline;
+  cursor: pointer;
+  opacity: 0.7;
+  transition: opacity 0.2s;
+}
+
+.back-link:hover {
+  opacity: 1;
+  color: var(--text);
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Summary Items in Confirmation */
+.summary-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 0.75rem;
+  border-radius: 0.75rem;
+  border: 1px solid var(--border);
+}
+
+.summary-icon {
+  font-size: 1.25rem;
+  background: var(--bg-card);
+  width: 2.5rem;
+  height: 2.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.5rem;
+  border: 1px solid var(--border);
+}
+
+.summary-text p {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  margin: 0;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.summary-text h4 {
+  font-size: 0.9rem;
+  margin: 0.1rem 0 0;
+  color: var(--text);
+  font-weight: 600;
+}

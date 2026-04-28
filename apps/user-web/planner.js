@@ -1,489 +1,354 @@
-"use strict";
-
-function _regenerator() { /*! regenerator-runtime -- Copyright (c) 2014-present, Facebook, Inc. -- license (MIT): https://github.com/babel/babel/blob/main/packages/babel-helpers/LICENSE */ var e, t, r = "function" == typeof Symbol ? Symbol : {}, n = r.iterator || "@@iterator", o = r.toStringTag || "@@toStringTag"; function i(r, n, o, i) { var c = n && n.prototype instanceof Generator ? n : Generator, u = Object.create(c.prototype); return _regeneratorDefine2(u, "_invoke", function (r, n, o) { var i, c, u, f = 0, p = o || [], y = !1, G = { p: 0, n: 0, v: e, a: d, f: d.bind(e, 4), d: function d(t, r) { return i = t, c = 0, u = e, G.n = r, a; } }; function d(r, n) { for (c = r, u = n, t = 0; !y && f && !o && t < p.length; t++) { var o, i = p[t], d = G.p, l = i[2]; r > 3 ? (o = l === n) && (u = i[(c = i[4]) ? 5 : (c = 3, 3)], i[4] = i[5] = e) : i[0] <= d && ((o = r < 2 && d < i[1]) ? (c = 0, G.v = n, G.n = i[1]) : d < l && (o = r < 3 || i[0] > n || n > l) && (i[4] = r, i[5] = n, G.n = l, c = 0)); } if (o || r > 1) return a; throw y = !0, n; } return function (o, p, l) { if (f > 1) throw TypeError("Generator is already running"); for (y && 1 === p && d(p, l), c = p, u = l; (t = c < 2 ? e : u) || !y;) { i || (c ? c < 3 ? (c > 1 && (G.n = -1), d(c, u)) : G.n = u : G.v = u); try { if (f = 2, i) { if (c || (o = "next"), t = i[o]) { if (!(t = t.call(i, u))) throw TypeError("iterator result is not an object"); if (!t.done) return t; u = t.value, c < 2 && (c = 0); } else 1 === c && (t = i.return) && t.call(i), c < 2 && (u = TypeError("The iterator does not provide a '" + o + "' method"), c = 1); i = e; } else if ((t = (y = G.n < 0) ? u : r.call(n, G)) !== a) break; } catch (t) { i = e, c = 1, u = t; } finally { f = 1; } } return { value: t, done: y }; }; }(r, o, i), !0), u; } var a = {}; function Generator() {} function GeneratorFunction() {} function GeneratorFunctionPrototype() {} t = Object.getPrototypeOf; var c = [][n] ? t(t([][n]())) : (_regeneratorDefine2(t = {}, n, function () { return this; }), t), u = GeneratorFunctionPrototype.prototype = Generator.prototype = Object.create(c); function f(e) { return Object.setPrototypeOf ? Object.setPrototypeOf(e, GeneratorFunctionPrototype) : (e.__proto__ = GeneratorFunctionPrototype, _regeneratorDefine2(e, o, "GeneratorFunction")), e.prototype = Object.create(u), e; } return GeneratorFunction.prototype = GeneratorFunctionPrototype, _regeneratorDefine2(u, "constructor", GeneratorFunctionPrototype), _regeneratorDefine2(GeneratorFunctionPrototype, "constructor", GeneratorFunction), GeneratorFunction.displayName = "GeneratorFunction", _regeneratorDefine2(GeneratorFunctionPrototype, o, "GeneratorFunction"), _regeneratorDefine2(u), _regeneratorDefine2(u, o, "Generator"), _regeneratorDefine2(u, n, function () { return this; }), _regeneratorDefine2(u, "toString", function () { return "[object Generator]"; }), (_regenerator = function _regenerator() { return { w: i, m: f }; })(); }
-function _regeneratorDefine2(e, r, n, t) { var i = Object.defineProperty; try { i({}, "", {}); } catch (e) { i = 0; } _regeneratorDefine2 = function _regeneratorDefine(e, r, n, t) { function o(r, n) { _regeneratorDefine2(e, r, function (e) { return this._invoke(r, n, e); }); } r ? i ? i(e, r, { value: n, enumerable: !t, configurable: !t, writable: !t }) : e[r] = n : (o("next", 0), o("throw", 1), o("return", 2)); }, _regeneratorDefine2(e, r, n, t); }
-function asyncGeneratorStep(n, t, e, r, o, a, c) { try { var i = n[a](c), u = i.value; } catch (n) { return void e(n); } i.done ? t(u) : Promise.resolve(u).then(r, o); }
-function _asyncToGenerator(n) { return function () { var t = this, e = arguments; return new Promise(function (r, o) { var a = n.apply(t, e); function _next(n) { asyncGeneratorStep(a, r, o, _next, _throw, "next", n); } function _throw(n) { asyncGeneratorStep(a, r, o, _next, _throw, "throw", n); } _next(void 0); }); }; }
+/* ===================== PLANNER.JS ===================== */
 document.addEventListener('DOMContentLoaded', function () {
-  var form = document.getElementById('aiPlannerForm');
-  var btn = document.getElementById('generateBtn');
-  var placeholder = document.getElementById('resultPlaceholder');
-  var loader = document.getElementById('aiLoader');
-  var resultContainer = document.getElementById('timelineResult');
-  var refineBox = document.getElementById('refineBox');
-  var refineForm = document.getElementById('refineForm');
-  var refineInput = document.getElementById('refineInput');
-  var refineBtn = document.getElementById('refineBtn');
-  var timelineContent = document.getElementById('timelineContent');
-  var versionTabs = document.getElementById('versionTabs');
-  var btnSaveTrip = document.getElementById('btnSaveTrip');
-  var btnStartNav = document.getElementById('btnStartNav');
-  var saveTripStatus = document.getElementById('saveTripStatus');
+  const form = document.getElementById('aiPlannerForm');
+  const resultContainer = document.getElementById('timelineResult');
+  const loader = document.getElementById('aiLoader');
+  const placeholder = document.getElementById('resultPlaceholder');
+  const refineBox = document.getElementById('refineBox');
+  const refineForm = document.getElementById('refineForm');
+  const refineInput = document.getElementById('refineInput');
+  const refineBtn = document.getElementById('refineBtn');
+  const btnModeForm = document.getElementById('btnModeForm');
+  const btnModeDiscovery = document.getElementById('btnModeDiscovery');
+  const stepBasic = document.getElementById('stepBasic');
+  const stepSmartWizard = document.getElementById('stepSmartWizard');
+  const btnSaveTrip = document.getElementById('btnSaveTrip');
+  const versionTabs = document.getElementById('versionTabs');
 
-  // Lưu trữ Lịch sử phiên bản
-  var planHistory = [];
-  var currentPlanIndex = -1;
-  var currentItineraryId = null;
+  let currentItineraryId = null;
+  let planHistory = [];
+  let currentPlanIndex = -1;
 
-  // ---- Chế độ Xem Lịch Trình (từ My Trips hoặc Lịch sử) ----
-  var urlParams = new URLSearchParams(window.location.search);
-  var viewModeHeader = document.getElementById('viewModeHeader');
-  var itinId = urlParams.get('itin');
-  if (itinId) {
-    itinId = itinId.trim();
-    placeholder.style.display = 'none';
-    loader.style.display = 'flex';
-    var token = localStorage.getItem('wander_token');
-    fetch('/api/planner/itinerary/' + itinId, {
-      headers: { 'x-auth-token': token || '' }
-    })
-      .then(function(r) { return r.json(); })
-      .then(function(json) {
-        loader.style.display = 'none';
-        if (json.success && json.data) {
-          var itin = json.data;
-          var plan = itin.planJson;
-          currentItineraryId = itin._id;
-          planHistory.push(plan);
-          currentPlanIndex = 0;
-          
-          viewModeHeader.style.display = 'flex';
-          var formCard = form.closest('.planner-form-card');
-          if (formCard) formCard.style.display = 'none';
-          
-          renderVersionTabs();
-          renderItinerary(plan, itin.destination || plan.destination || '', itin.days || plan.days || 1, itin.tripDate);
-          resultContainer.style.display = 'block';
-          refineBox.style.display = 'block';
-          btnSaveTrip.style.display = 'none';
-        } else {
-          loader.style.display = 'none';
-          placeholder.style.display = 'flex';
-          if (window.WanderUI && WanderUI.showToast) {
-            WanderUI.showToast(json.message || 'Không tìm thấy lịch trình này.', 'error');
-          } else {
-            console.warn('Itin not found:', json.message);
-          }
-        }
-      })
-      .catch(function(err) {
-        loader.style.display = 'none';
-        placeholder.style.display = 'flex';
-        console.error("Fetch itin error", err);
-      });
-  } else if (urlParams.get('view') === 'true') {
-    var stored = sessionStorage.getItem('wander_view_trip');
-    if (stored) {
-      try {
-        var plan = JSON.parse(stored);
-        planHistory.push(plan);
-        currentPlanIndex = 0;
-        viewModeHeader.style.display = 'flex';
-        var formCard = form.closest('.planner-form-card');
-        if (formCard) formCard.style.display = 'none';
-        renderVersionTabs();
-        renderItinerary(plan, plan.destination || '', '');
-        resultContainer.style.display = 'block';
-        refineBox.style.display = 'block';
-        placeholder.style.display = 'none';
-        resetSaveButton();
-        btnSaveTrip.style.display = 'none';
-      } catch (e) {
-        console.error('Lỗi parse session trip:', e);
-      }
-    }
-  }
-
-  // Set default trip date to today
-  var tripDateInput = document.getElementById('tripDate');
-  var todayStr = new Date().toISOString().split('T')[0];
-  tripDateInput.setAttribute('min', todayStr);
-  tripDateInput.value = todayStr;
-  // ============================
-  // BƯỚC 2: Chat Wizard Logic
-  // ============================
-  var chatData = {}; // Holds all collected answers
-  var chatMsgs = document.getElementById('chatMessages');
-  var chatAnswerForm = document.getElementById('chatAnswerForm');
-  var chatAnswerInput = document.getElementById('chatAnswerInput');
-  var chatChips = document.getElementById('chatChips');
-  var btnConfirmGenerate = document.getElementById('btnConfirmGenerate');
-  var btnBackToStep1 = document.getElementById('btnBackToStep1');
-  var stepBasic = document.getElementById('stepBasic');
-  var stepChat = document.getElementById('stepChat');
-  var stepDiscovery = document.getElementById('stepDiscovery');
-
-  // ============================
-  // BƯỚC KHÁM PHÁ: AI Discovery Logic
-  // ============================
-  var discoveryMsgs = document.getElementById('discoveryMessages');
-  var discoveryForm = document.getElementById('discoveryForm');
-  var discoveryInput = document.getElementById('discoveryInput');
-  var discoveryChips = document.getElementById('discoveryChips');
-  var discoveryActionBox = document.getElementById('discoveryActionBox');
-  var btnAcceptDiscovery = document.getElementById('btnAcceptDiscovery');
-  var btnModeForm = document.getElementById('btnModeForm');
-  var btnModeDiscovery = document.getElementById('btnModeDiscovery');
-  
-  var discoveryHistory = [];
-  var discoveredDestination = "";
-  var discoveredBudget = "";
-  var discoveredExactBudget = "";
-  var discoveredIsShortTerm = false;
-  var discoveredOutingTime = "";
-
-  // Switch modes
-  if (btnModeForm && btnModeDiscovery) {
-    // Initial state
-    btnModeForm.style.background = 'var(--accent)';
-    btnModeForm.style.color = '#fff';
-
-    btnModeForm.addEventListener('click', function() {
-      stepBasic.style.display = 'block';
-      stepDiscovery.style.display = 'none';
-      stepChat.style.display = 'none';
-      btnModeForm.style.background = 'var(--accent)';
-      btnModeForm.style.color = '#fff';
-      btnModeDiscovery.style.background = 'var(--bg-card)';
-      btnModeDiscovery.style.color = 'var(--text)';
-    });
-
-    btnModeDiscovery.addEventListener('click', function() {
-      stepBasic.style.display = 'none';
-      stepDiscovery.style.display = 'block';
-      stepChat.style.display = 'none';
-      btnModeDiscovery.style.background = 'var(--accent)';
-      btnModeDiscovery.style.color = '#fff';
-      btnModeForm.style.background = 'var(--bg-card)';
-      btnModeForm.style.color = 'var(--text)';
-      
-      if (discoveryMsgs.children.length === 0) {
-        addDiscoveryBubble('Chào bạn! Bạn đang phân vân không biết đi đâu? Hãy cho tôi biết ngân sách và sở thích của bạn (VD: 5 triệu đi đâu cho mát?), tôi sẽ gợi ý cho bạn nhé! ✨', 'ai');
-      }
-    });
-  }
+  // --- Discovery Logic ---
+  const discoveryForm = document.getElementById('discoveryForm');
+  const discoveryInput = document.getElementById('discoveryInput');
+  const discoveryMessages = document.getElementById('discoveryMessages');
+  let discoveryHistory = [];
 
   function addDiscoveryBubble(text, role) {
-    var bubble = document.createElement('div');
-    bubble.className = 'chat-bubble ' + role;
-    if (role === 'ai') {
-      bubble.innerHTML = '<strong>✨ WanderAI</strong>' + text;
-    } else {
-      bubble.textContent = text;
-    }
-    discoveryMsgs.appendChild(bubble);
-    discoveryMsgs.scrollTop = discoveryMsgs.scrollHeight;
+    const b = document.createElement('div');
+    b.className = `chat-bubble ${role}`;
+    b.innerHTML = role === 'ai' ? `<strong>✨ WanderAI</strong>${text}` : text;
+    discoveryMessages.appendChild(b);
+    discoveryMessages.scrollTop = discoveryMessages.scrollHeight;
+  }
+
+  if (btnModeForm && btnModeDiscovery) {
+    btnModeForm.addEventListener('click', () => {
+      btnModeForm.classList.add('active');
+      btnModeDiscovery.classList.remove('active');
+      document.getElementById('stepBasic').style.display = 'block';
+      document.getElementById('stepDiscovery').style.display = 'none';
+    });
+    btnModeDiscovery.addEventListener('click', () => {
+      btnModeDiscovery.classList.add('active');
+      btnModeForm.classList.remove('active');
+      document.getElementById('stepDiscovery').style.display = 'block';
+      document.getElementById('stepBasic').style.display = 'none';
+      if (discoveryHistory.length === 0) {
+        addDiscoveryBubble("Chào bạn! Bạn đang phân vân không biết đi đâu? Hãy cho tôi biết ngân sách và sở thích (VD: 5 triệu đi đâu mát mẻ?), tôi sẽ gợi ý cho bạn nhé! ✨", "ai");
+      }
+    });
   }
 
   if (discoveryForm) {
-    discoveryForm.addEventListener('submit', /*#__PURE__*/function () {
-      var _refDiscovery = _asyncToGenerator(/*#__PURE__*/_regenerator().m(function _calleeDiscovery(e) {
-        var val, res, data;
-        return _regenerator().w(function (_contextDiscovery) {
-          while (1) switch (_contextDiscovery.p = _contextDiscovery.n) {
-            case 0:
-              e.preventDefault();
-              val = discoveryInput.value.trim();
-              if (val) {
-                _contextDiscovery.n = 1;
-                break;
-              }
-              return _contextDiscovery.a(2);
-            case 1:
-              addDiscoveryBubble(val, 'user');
-              discoveryInput.value = '';
-              discoveryChips.innerHTML = '';
-              _contextDiscovery.p = 2;
-              _contextDiscovery.n = 3;
-              return fetch('/api/planner/discover', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message: val, history: discoveryHistory })
-              });
-            case 3:
-              res = _contextDiscovery.v;
-              _contextDiscovery.n = 4;
-              return res.json();
-            case 4:
-              data = _contextDiscovery.v;
-              if (data.success) {
-                addDiscoveryBubble(data.answer, 'ai');
-                discoveryHistory.push({ role: 'user', content: val });
-                discoveryHistory.push({ role: 'assistant', content: data.answer });
-                
-                if (data.suggestions && data.suggestions.length > 0) {
-                  data.suggestions.forEach(function(s) {
-                    var chip = document.createElement('button');
-                    chip.type = 'button';
-                    chip.className = 'chat-chip';
-                    chip.textContent = s;
-                    chip.addEventListener('click', function() {
-                      discoveryInput.value = s;
-                      discoveryForm.dispatchEvent(new Event('submit'));
-                    });
-                    discoveryChips.appendChild(chip);
-                  });
-                }
-                
-                if (data.finalSelection) {
-                  discoveredDestination = data.finalSelection;
-                  discoveredBudget = data.suggestedBudget;
-                  discoveredExactBudget = data.exactBudget;
-                  discoveredIsShortTerm = !!data.isShortTerm;
-                  discoveredOutingTime = data.outingTime || "";
-                  discoveryActionBox.style.display = 'block';
-                } else {
-                  discoveryActionBox.style.display = 'none';
-                }
-              }
-              _contextDiscovery.n = 6;
-              break;
-            case 5:
-              _contextDiscovery.p = 5;
-              console.error(_contextDiscovery.v);
-              addDiscoveryBubble('Có lỗi xảy ra, vui lòng thử lại.', 'ai');
-            case 6:
-              return _contextDiscovery.a(2);
+    discoveryForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const val = discoveryInput.value.trim();
+      if (!val) return;
+      addDiscoveryBubble(val, 'user');
+      discoveryInput.value = '';
+      document.getElementById('discoveryChips').innerHTML = '';
+
+      try {
+        const res = await fetch('/api/planner/discover', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: val, history: discoveryHistory })
+        });
+        const data = await res.json();
+        if (data.success) {
+          addDiscoveryBubble(data.answer, 'ai');
+          discoveryHistory.push({ role: 'user', content: val }, { role: 'assistant', content: data.answer });
+          if (data.suggestions) {
+            data.suggestions.forEach(s => {
+              const chip = document.createElement('button');
+              chip.className = 'chat-chip';
+              chip.textContent = s;
+              chip.onclick = () => { discoveryInput.value = s; discoveryForm.dispatchEvent(new Event('submit')); };
+              document.getElementById('discoveryChips').appendChild(chip);
+            });
           }
-        }, _calleeDiscovery, null, [[2, 5]]);
-      }));
-      return function (_xDiscovery) {
-        return _refDiscovery.apply(this, arguments);
+          if (data.finalSelection) {
+            document.getElementById('discoveryActionBox').style.display = 'block';
+            discoveryForm.dataset.final = data.finalSelection;
+            discoveryForm.dataset.budget = data.suggestedBudget;
+            discoveryForm.dataset.days = data.suggestedDays || 3;
+          }
+        }
+      } catch(err) { console.error(err); }
+    });
+  }
+
+  document.getElementById('btnAcceptDiscovery')?.addEventListener('click', () => {
+    document.getElementById('dest').value = discoveryForm.dataset.final;
+    document.getElementById('budget').value = discoveryForm.dataset.budget;
+    document.getElementById('days').value = discoveryForm.dataset.days;
+    SmartWizard.startSmartWizardFromForm();
+  });
+
+  // ==========================================
+  // SMART WIZARD UI LOGIC
+  // ==========================================
+  const SmartWizard = {
+    data: {
+      destination: '', days: 0, budget: '3 đến 7 triệu VNĐ',
+      objective: [], style: [], pace: 'Vừa phải',
+      companion: 'Bạn bè', interests: [], tripDate: ''
+    },
+    history: [],
+
+    init() {
+      this.dom = {
+        chatArea: document.getElementById('smartChatArea'),
+        optionsArea: document.getElementById('smartOptionsArea'),
+        inputArea: document.getElementById('smartInputArea'),
+        chatForm: document.getElementById('smartChatForm'),
+        chatInput: document.getElementById('smartChatInput'),
+        confirmationArea: document.getElementById('smartConfirmationArea'),
+        summary: document.getElementById('detectedDataSummary'),
+        btnFinal: document.getElementById('btnFinalGenerate'),
+        basicForm: document.getElementById('aiPlannerForm')
       };
-    }());
-  }
 
-  if (btnAcceptDiscovery) {
-    btnAcceptDiscovery.addEventListener('click', function() {
-      document.getElementById('dest').value = discoveredDestination;
-      if (discoveredBudget) {
-        document.getElementById('budget').value = discoveredBudget;
-      }
-      // Store exact budget in chatData for later use in doGenerate
-      chatData.exactBudget = discoveredExactBudget;
-      chatData.isShortTerm = discoveredIsShortTerm;
-      chatData.outingTime = discoveredOutingTime;
-
-      // Toggle UI
-      if (discoveredIsShortTerm) {
-        document.getElementById('groupDays').style.display = 'none';
-        document.getElementById('groupTime').style.display = 'block';
-        document.getElementById('days').value = 1; // Default for short term
-        document.getElementById('outingTime').value = discoveredOutingTime;
-      } else {
-        document.getElementById('groupDays').style.display = 'block';
-        document.getElementById('groupTime').style.display = 'none';
-      }
-      
-      btnModeForm.click();
-      // Optional: highlight the destination field
-      document.getElementById('dest').focus();
-      document.getElementById('dest').style.boxShadow = '0 0 0 4px rgba(16, 185, 129, 0.4)';
-      setTimeout(() => {
-        document.getElementById('dest').style.boxShadow = '';
-      }, 2000);
-    });
-  }
-
-  var QUESTIONS = [
-    {
-      key: 'accommodation',
-      question: 'Bạn muốn ở đâu trong chuyến đi?',
-      chips: ['Khách sạn 2-3 sao', 'Homestay / Nhà nghỉ bình dân', 'Hostel / Giường tầng (siêu tiết kiệm)', 'Cắm trại / Dã ngoại', 'Không cần AI gợi ý (tự túc)'],
-      freeText: false
-    },
-    {
-      key: 'transport',
-      question: 'Bạn sẽ di chuyển bằng phương tiện gì?',
-      chips: ['Máy bay + xe dịch vụ', 'Xe khách / Tàu hỏa', 'Thuê xe máy tự lái', 'Phượt bằng xe máy từ nhà'],
-      freeText: false
-    },
-    {
-      key: 'companion',
-      question: 'Bạn đi cùng ai?',
-      chips: ['Đi một mình 🧍', 'Đi đôi / Couple 💑', 'Nhóm bạn bè 👫', 'Gia đình có trẻ nhỏ 👨‍👩‍👧', 'Gia đình người lớn'],
-      freeText: false
-    },
-    {
-      key: 'pace',
-      question: 'Bạn muốn nhịp độ chuyến đi như thế nào?',
-      chips: ['Thư giãn (ít di chuyển, nghỉ ngơi nhiều)', 'Cân bằng (kết hợp tham quan và nghỉ)', 'Năng động (đi nhiều điểm, check-in)', 'Phiêu lưu mạo hiểm (trekking, leo núi)'],
-      freeText: false
-    },
-    {
-      key: 'interests',
-      question: 'Bạn có sở thích hay yêu cầu đặc biệt nào không? (Nhập hoặc bấm Bỏ qua)',
-      chips: ['Bỏ qua'],
-      freeText: true
-    }
-  ];
-
-  var currentQuestion = 0;
-
-  function addBubble(text, role) {
-    var bubble = document.createElement('div');
-    bubble.className = 'chat-bubble ' + role;
-    if (role === 'ai') {
-      bubble.innerHTML = '<strong>✨ WanderAI</strong>' + text;
-    } else {
-      bubble.textContent = text;
-    }
-    chatMsgs.appendChild(bubble);
-    chatMsgs.scrollTop = chatMsgs.scrollHeight;
-  }
-
-  function renderQuestion(idx) {
-    chatChips.innerHTML = '';
-    chatAnswerForm.style.display = 'none';
-    btnConfirmGenerate.style.display = 'none';
-
-    if (idx >= QUESTIONS.length) {
-      // All done
-      addBubble('Tuyệt vời! Tôi đã có đủ thông tin. Nhấn nút bên dưới để AI lên lịch trình cho bạn! 🚀', 'ai');
-      btnConfirmGenerate.style.display = 'block';
-      return;
-    }
-
-    var q = QUESTIONS[idx];
-    addBubble(q.question, 'ai');
-
-    // --- LỌC CHIPS THEO NGÂN SÁCH ---
-    var budgetStr = chatData.budget || '';
-    var budgetNum = parseInt(budgetStr.replace(/[^0-9]/g, '')) || 0;
-    var days = parseInt(chatData.days) || 1;
-    var budgetPerDay = budgetNum / days;
-
-    var filteredChips = q.chips.filter(function(chip) {
-      // Lọc chỗ ở
-      if (q.key === 'accommodation') {
-        if (budgetPerDay < 300000 && chip.includes('2-3 sao')) return false;
-        if (budgetPerDay < 150000 && chip.includes('Homestay')) return false;
-      }
-      // Lọc phương tiện
-      if (q.key === 'transport') {
-        if (budgetNum < 2000000 && chip.includes('Máy bay')) return false;
-        // Nếu đi Bắc Ninh/Hải Dương (gần HN) mà ngân sách thấp thì không máy bay
-        var dest = (chatData.destination || '').toLowerCase();
-        if ((dest.includes('bắc ninh') || dest.includes('hải dương') || dest.includes('hà nội')) && chip.includes('Máy bay')) return false;
-      }
-      return true;
-    });
-
-    // Nếu sau khi lọc không còn chip nào (trường hợp cực hiếm), dùng mặc định hoặc "Tự túc"
-    if (filteredChips.length === 0) filteredChips = [q.chips[q.chips.length - 1]];
-
-    // Render filtered chips
-    filteredChips.forEach(function(chip) {
-      var btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'chat-chip';
-      btn.textContent = chip;
-      btn.addEventListener('click', function() {
-        var answer = chip === 'Bỏ qua' ? 'Không có yêu cầu đặc biệt' : chip;
-        addBubble(chip, 'user');
-        chatData[q.key] = answer;
-        currentQuestion++;
-        setTimeout(function() { renderQuestion(currentQuestion); }, 350);
+      this.dom.chatForm?.addEventListener('submit', (e) => {
+        e.preventDefault();
+        this.handleMessage(this.dom.chatInput.value);
+        this.dom.chatInput.value = '';
       });
-      chatChips.appendChild(btn);
-    });
+      this.dom.btnFinal?.addEventListener('click', () => this.generateItinerary());
+      this.dom.basicForm?.addEventListener('submit', (e) => {
+        e.preventDefault();
+        this.startSmartWizardFromForm();
+      });
+    },
 
-    // Free-text input
-    if (q.freeText) {
-      chatAnswerForm.style.display = 'flex';
-      chatAnswerInput.value = '';
-      chatAnswerInput.focus();
-    }
-  }
+    startSmartWizardFromForm() {
+      this.data.destination = document.getElementById('dest').value;
+      this.data.days = parseInt(document.getElementById('days').value);
+      this.data.budget = document.getElementById('budget').value;
+      this.data.tripDate = document.getElementById('tripDate').value;
+      this.data.companion = document.getElementById('companion').value;
+      this.data.objective = [document.getElementById('objective').value];
 
-  // Step 1 form submit → move to chat
-  form.addEventListener('submit', function(e) {
-    e.preventDefault();
-    chatData.destination = document.getElementById('dest').value.trim();
-    chatData.days = parseInt(document.getElementById('days').value) || 1;
-    chatData.budget = document.getElementById('budget').value;
-    chatData.tripDate = document.getElementById('tripDate').value;
-    chatData.outingTime = document.getElementById('outingTime').value;
+      stepBasic.style.display = 'none';
+      document.getElementById('stepDiscovery').style.display = 'none';
+      stepSmartWizard.style.display = 'block';
+      this.dom.chatArea.innerHTML = '';
+      this.history = [];
+      this.handleMessage(`Tôi muốn đi ${this.data.destination} trong ${this.data.days} ngày với ngân sách ${this.data.budget}. Tôi đi cùng ${this.data.companion} với mục tiêu ${this.data.objective[0]}. Hãy gợi ý tiếp các chi tiết khác.`);
+    },
 
-    // Check if short term was toggled manually or from discovery
-    var isShort = document.getElementById('groupTime').style.display === 'block';
-    chatData.isShortTerm = isShort;
+    async handleMessage(text) {
+      if (!text.trim()) return;
+      if (text !== "Tôi đã chọn xong") this.addBubble(text, 'user');
 
-    console.log('--- STEP 1 DATA CAPTURED ---');
-    console.log('Dest:', chatData.destination);
-    console.log('Days:', chatData.days);
-    console.log('Budget:', chatData.budget);
+      try {
+        const response = await fetch('/api/planner/smart-wizard', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: text, currentData: this.data, history: this.history })
+        });
+        const result = await response.json();
+        if (result.success) {
+          this.addBubble(result.aiMessage, 'ai');
+          this.history.push({ role: 'user', content: text }, { role: 'assistant', content: result.aiMessage });
+          if (result.detectedData) this.data = { ...this.data, ...result.detectedData };
+          
+          // Xử lý hiển thị dựa trên bước tiếp theo
+          if (result.nextStep === 'ready') {
+            this.renderOptions(null); // Xóa các options cũ
+            this.showConfirmation();
+          } else if (result.uiOptions) {
+            this.dom.confirmationArea.style.display = 'none';
+            this.dom.inputArea.style.display = 'flex';
+            this.renderOptions(result.uiOptions);
+          } else {
+            this.renderOptions(null);
+          }
+        }
+      } catch (error) { console.error(error); }
+    },
 
-    // Hide step 1, show step 2
-    stepBasic.style.display = 'none';
-    stepChat.style.display = 'block';
-    chatMsgs.innerHTML = '';
-    currentQuestion = 0;
+    addBubble(text, role) {
+      const bubble = document.createElement('div');
+      bubble.className = `chat-bubble ${role}`;
+      if (role === 'ai') {
+        let ft = text.trim();
+        // Xóa dấu phẩy thừa ở đầu nếu có
+        if (ft.startsWith(',')) ft = ft.substring(1).trim();
 
-    addBubble(`Tuyệt! ${chatData.destination} trong ${chatData.days} ngày với ngân sách <strong>${chatData.budget}</strong>. Cho tôi hỏi thêm một chút để lên kế hoạch thật hợp lý nhé! 😊`, 'ai');
-    setTimeout(function() { renderQuestion(currentQuestion); }, 500);
-  });
+        ft = ft.replace(/(\d+ ĐẾN \d+ TRIỆU VNĐ)/gi, '<strong style="color: #06b6d4;">$1</strong>')
+               .replace(/(\d+ ngày)/gi, '<strong style="color: #06b6d4;">$1</strong>')
+               .replace(/(\d+ TR VNĐ)/gi, '<strong style="color: #06b6d4;">$1</strong>');
+        bubble.innerHTML = `<div class="chat-header"><span class="chat-icon">✨</span><span class="chat-name">WANDERAI</span></div><div class="chat-content">${ft}</div>`;
+      } else { bubble.textContent = text; }
+      this.dom.chatArea.appendChild(bubble);
+      this.dom.chatArea.scrollTop = this.dom.chatArea.scrollHeight;
+    },
 
-  // Free text answer submit
-  chatAnswerForm.addEventListener('submit', function(e) {
-    e.preventDefault();
-    var val = chatAnswerInput.value.trim();
-    if (!val) return;
-    addBubble(val, 'user');
-    chatData[QUESTIONS[currentQuestion].key] = val;
-    currentQuestion++;
-    chatChips.innerHTML = '';
-    chatAnswerForm.style.display = 'none';
-    setTimeout(function() { renderQuestion(currentQuestion); }, 350);
-  });
+    renderOptions(uiOptions) {
+      this.dom.optionsArea.innerHTML = '';
+      if (!uiOptions || !uiOptions.groups || uiOptions.groups.length === 0) {
+        this.dom.optionsArea.style.display = 'none';
+        return;
+      }
+      this.dom.optionsArea.style.display = 'block';
+      const container = document.createElement('div');
+      container.className = 'smart-chat-options-wrapper';
+      
+      uiOptions.groups.forEach(group => {
+        const label = document.createElement('p');
+        label.style = 'font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.5rem; margin-top: 1rem; font-weight: 700; text-transform: uppercase;';
+        label.textContent = group.title;
+        container.appendChild(label);
+        
+        const chips = document.createElement('div');
+        chips.className = 'planner-chat-chips';
+        chips.style = 'display: flex; flex-wrap: wrap; gap: 0.5rem;';
+        
+        group.options.forEach(opt => {
+          const chip = document.createElement('button');
+          chip.type = 'button';
+          chip.className = 'chat-chip';
+          if (this.isOptionSelected(group.id, opt.id)) chip.classList.add('is-selected');
+          
+          chip.innerHTML = `${opt.icon} ${opt.label}`;
+          
+          // Sử dụng addEventListener thay vì onclick để ổn định hơn
+          chip.addEventListener('click', (e) => {
+            e.preventDefault();
+            this.toggleOption(group.id, opt, chip, uiOptions.type);
+          });
+          
+          chips.appendChild(chip);
+        });
+        container.appendChild(chips);
+      });
 
-  // Back button
-  if (btnBackToStep1) {
-    btnBackToStep1.addEventListener('click', function() {
-      stepBasic.style.display = 'block';
-      stepChat.style.display = 'none';
-      chatData = {};
-      currentQuestion = 0;
-    });
-  }
+      this.dom.optionsArea.appendChild(container);
 
-  // Confirm generate
-  if (btnConfirmGenerate) {
-    btnConfirmGenerate.addEventListener('click', function() {
-      doGenerate(chatData);
-    });
-  }
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'planner-btn';
+      btn.style.marginTop = '1.5rem';
+      btn.style.background = 'linear-gradient(135deg, #10b981, #059669)';
+      btn.textContent = 'Tôi đã chọn xong';
+      btn.addEventListener('click', () => this.handleMessage("Tôi đã chọn xong"));
+      this.dom.optionsArea.appendChild(btn);
+
+      const back = document.createElement('a');
+      back.className = 'back-link';
+      back.style.display = 'block';
+      back.style.textAlign = 'center';
+      back.style.marginTop = '1rem';
+      back.innerHTML = '← Nhập lại thông tin cơ bản';
+      back.onclick = (e) => { 
+        e.preventDefault(); 
+        stepSmartWizard.style.display = 'none'; 
+        document.getElementById('stepBasic').style.display = 'block'; 
+      };
+      this.dom.optionsArea.appendChild(back);
+    },
+
+    isOptionSelected(g, id) {
+      const v = this.data[g];
+      if (Array.isArray(v)) return v.includes(id);
+      return v === id;
+    },
+
+    toggleOption(g, opt, chip, type) {
+      if (type === 'single_select') {
+        chip.parentElement.querySelectorAll('.chat-chip').forEach(c => c.classList.remove('is-selected'));
+        this.data[g] = opt.id;
+        chip.classList.add('is-selected');
+      } else {
+        if (!Array.isArray(this.data[g])) {
+           this.data[g] = this.data[g] ? [this.data[g]] : [];
+        }
+        const idx = this.data[g].indexOf(opt.id);
+        if (idx > -1) {
+          this.data[g].splice(idx, 1);
+          chip.classList.remove('is-selected');
+        } else {
+          this.data[g].push(opt.id);
+          chip.classList.add('is-selected');
+        }
+      }
+      console.log('Wizard Data Updated:', this.data);
+    },
+
+    showConfirmation() {
+      this.dom.optionsArea.innerHTML = '';
+      this.dom.confirmationArea.style.display = 'block';
+      this.dom.inputArea.style.display = 'none';
+      
+      const d = this.data;
+      const dateStr = d.tripDate ? new Date(d.tripDate).toLocaleDateString('vi-VN') : '---';
+      
+      this.dom.summary.innerHTML = `
+        <div style="margin-bottom: 1.25rem; text-align: center;">
+          <h4 style="color: var(--accent, #10b981); margin-bottom: 0.25rem; font-size: 0.9rem; letter-spacing: 1px;">XÁC NHẬN HÀNH TRÌNH</h4>
+          <p style="font-size: 0.75rem; color: var(--text-muted);">AI đã sẵn sàng, hãy kiểm tra lại thông tin</p>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+          <div class="summary-item">
+            <span class="summary-icon">📍</span>
+            <div class="summary-text"><p>ĐIỂM ĐẾN</p><h4>${d.destination}</h4></div>
+          </div>
+          <div class="summary-item">
+            <span class="summary-icon">📅</span>
+            <div class="summary-text"><p>NGÀY ĐI</p><h4>${dateStr}</h4></div>
+          </div>
+          <div class="summary-item">
+            <span class="summary-icon">📆</span>
+            <div class="summary-text"><p>THỜI GIAN</p><h4>${d.days} Ngày</h4></div>
+          </div>
+          <div class="summary-item">
+            <span class="summary-icon">💰</span>
+            <div class="summary-text"><p>NGÂN SÁCH</p><h4>${d.budget}</h4></div>
+          </div>
+          <div class="summary-item" style="grid-column: span 2;">
+            <span class="summary-icon">👥</span>
+            <div class="summary-text"><p>ĐI CÙNG</p><h4>${d.companion}</h4></div>
+          </div>
+        </div>
+        <div style="margin-top: 1rem; padding: 0.75rem; background: rgba(16, 185, 129, 0.05); border-radius: 0.75rem; border: 1px solid rgba(16, 185, 129, 0.15);">
+          <p style="font-size: 0.7rem; color: var(--accent, #10b981); margin-bottom: 0.25rem; font-weight: 800; text-transform: uppercase;">Chi tiết phong cách</p>
+          <p style="font-size: 0.85rem; line-height: 1.4;">${d.style ? (Array.isArray(d.style) ? d.style.join(', ') : d.style) : 'AI tự đề xuất phong cách phù hợp nhất'}</p>
+        </div>
+      `;
+    },
+
+    generateItinerary() { doGenerate(this.data); }
+  };
+
+  SmartWizard.init();
 
   async function doGenerate(data) {
     placeholder.style.display = 'none';
     resultContainer.style.display = 'none';
     refineBox.style.display = 'none';
     loader.style.display = 'flex';
-    btnConfirmGenerate.disabled = true;
-    btnConfirmGenerate.textContent = 'Đang tạo...';
-
     try {
-      var token = localStorage.getItem('wander_token');
-      var res = await fetch('/api/planner/generate', {
+      const token = localStorage.getItem('wander_token');
+      const res = await fetch('/api/planner/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-auth-token': token || '' },
-        body: JSON.stringify({
-          destination: data.destination,
-          days: data.days,
-          budget: data.budget,
-          accommodation: data.accommodation,
-          transport: data.transport,
-          companion: data.companion,
-          pace: data.pace,
-          interests: data.interests,
-          tripDate: data.tripDate,
-          exactBudget: data.exactBudget,
-          isShortTerm: data.isShortTerm,
-          outingTime: data.outingTime
-        })
+        body: JSON.stringify({ ...data, tripDate: data.tripDate || '' })
       });
-      var json = await res.json();
-      if (json.success && json.plan) {
+      const json = await res.json();
+      if (json.success) {
         currentItineraryId = json.itineraryId;
         planHistory.push(json.plan);
         currentPlanIndex = planHistory.length - 1;
@@ -491,332 +356,75 @@ document.addEventListener('DOMContentLoaded', function () {
         renderItinerary(json.plan, data.destination, data.days, data.tripDate);
         resultContainer.style.display = 'block';
         refineBox.style.display = 'block';
-        resetSaveButton();
-        if (data.tripDate) saveTripReminder(data.destination, data.tripDate);
-      } else {
-        alert(json.message || 'Có lỗi xảy ra khi tạo lịch trình.');
-        placeholder.style.display = 'flex';
       }
-    } catch(err) {
-      console.error(err);
-      alert('Không thể kết nối AI. Vui lòng thử lại.');
-      placeholder.style.display = 'flex';
-    } finally {
-      loader.style.display = 'none';
-      btnConfirmGenerate.disabled = false;
-      btnConfirmGenerate.textContent = '🚀 Tạo lịch trình ngay!';
-    }
+    } catch(err) { console.error(err); }
+    finally { loader.style.display = 'none'; }
   }
 
-
-
-  // Chức năng Sửa lại lịch trình (Refine)
-  refineForm.addEventListener('submit', /*#__PURE__*/function () {
-    var _ref2 = _asyncToGenerator(/*#__PURE__*/_regenerator().m(function _callee2(e) {
-      var currentPlanJson, userFeedback, destination, days, token, res, data, _t2;
-      return _regenerator().w(function (_context2) {
-        while (1) switch (_context2.p = _context2.n) {
-          case 0:
-            e.preventDefault();
-            if (!(currentPlanIndex < 0)) {
-              _context2.n = 1;
-              break;
-            }
-            return _context2.a(2);
-          case 1:
-            currentPlanJson = planHistory[currentPlanIndex];
-            userFeedback = refineInput.value;
-            destination = document.getElementById('dest').value;
-            days = document.getElementById('days').value;
-            refineBtn.disabled = true;
-            refineBtn.innerText = 'Đang sửa...';
-            resultContainer.style.display = 'none';
-            refineBox.style.display = 'none';
-            loader.style.display = 'flex';
-            _context2.p = 2;
-            token = localStorage.getItem('wander_token');
-            _context2.n = 3;
-            return fetch('/api/planner/refine', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'x-auth-token': token || ''
-              },
-              body: JSON.stringify({
-                oldPlanJson: currentPlanJson,
-                userFeedback: userFeedback,
-                itineraryId: currentItineraryId
-              })
-            });
-          case 3:
-            res = _context2.v;
-            _context2.n = 4;
-            return res.json();
-          case 4:
-            data = _context2.v;
-            if (data.success && data.plan) {
-              planHistory.push(data.plan);
-              currentPlanIndex = planHistory.length - 1;
-              if (data.itineraryId) currentItineraryId = data.itineraryId;
-              renderVersionTabs();
-              renderItinerary(data.plan, destination, days, document.getElementById('tripDate').value);
-              resultContainer.style.display = 'block';
-              refineBox.style.display = 'block';
-              refineInput.value = '';
-              resetSaveButton();
-            } else {
-              alert(data.message || 'Có lỗi xảy ra, thử lại sau nhé.');
-              resultContainer.style.display = 'block';
-              refineBox.style.display = 'block';
-            }
-            _context2.n = 6;
-            break;
-          case 5:
-            _context2.p = 5;
-            _t2 = _context2.v;
-            console.error(_t2);
-            alert('Lỗi mạng, kiểm tra lại.');
-            resultContainer.style.display = 'block';
-            refineBox.style.display = 'block';
-          case 6:
-            _context2.p = 6;
-            refineBtn.disabled = false;
-            refineBtn.innerText = 'Sửa lại';
-            loader.style.display = 'none';
-            return _context2.f(6);
-          case 7:
-            return _context2.a(2);
-        }
-      }, _callee2, null, [[2, 5, 6, 7]]);
-    }));
-    return function (_x2) {
-      return _ref2.apply(this, arguments);
-    };
-  }());
-
-  // Lưu Vĩnh Viễn Lịch Trình Này
-  btnSaveTrip.addEventListener('click', /*#__PURE__*/_asyncToGenerator(/*#__PURE__*/_regenerator().m(function _callee3() {
-    var token, res, data, _t3;
-    return _regenerator().w(function (_context3) {
-      while (1) switch (_context3.p = _context3.n) {
-        case 0:
-          token = localStorage.getItem('wander_token');
-          if (token) {
-            _context3.n = 1;
-            break;
-          }
-          alert("Bạn cần Đăng Nhập để lưu lịch trình vào hồ sơ cá nhân!");
-          window.location.href = '/index.html#login'; // Redirect to home/login
-          return _context3.a(2);
-        case 1:
-          if (currentItineraryId) {
-            _context3.n = 2;
-            break;
-          }
-          alert("Lỗi: Không tìm thấy ID lịch trình. Vui lòng tạo lại.");
-          return _context3.a(2);
-        case 2:
-          btnSaveTrip.disabled = true;
-          saveTripStatus.style.display = 'block';
-          saveTripStatus.innerText = 'Đang lưu vào hồ sơ...';
-          _context3.p = 3;
-          _context3.n = 4;
-          return fetch('/api/planner/save', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'x-auth-token': token
-            },
-            body: JSON.stringify({
-              itineraryId: currentItineraryId
-            })
-          });
-        case 4:
-          res = _context3.v;
-          _context3.n = 5;
-          return res.json();
-        case 5:
-          data = _context3.v;
-          if (data.success) {
-            saveTripStatus.innerText = '✅ Đã lưu thành công! Hãy xem tại mục "Chuyến đi của tôi" trên menu.';
-            saveTripStatus.style.color = '#10b981';
-            btnSaveTrip.innerText = 'Đã Lưu Lịch Trình';
-          } else {
-            saveTripStatus.innerText = '❌ ' + (data.message || 'Lưu thất bại.');
-            saveTripStatus.style.color = '#f43f5e';
-            btnSaveTrip.disabled = false;
-          }
-          _context3.n = 7;
-          break;
-        case 6:
-          _context3.p = 6;
-          _t3 = _context3.v;
-          console.error(_t3);
-          saveTripStatus.innerText = '❌ Lỗi kết nối mạng.';
-          saveTripStatus.style.color = '#f43f5e';
-          btnSaveTrip.disabled = false;
-        case 7:
-          return _context3.a(2);
-      }
-    }, _callee3, null, [[3, 6]]);
-  })));
-
-  // Chuyển Ngay Sang Màn Hình Chỉ Đường (Navigator)
-  if (btnStartNav) {
-    btnStartNav.addEventListener('click', function () {
-      var _document$getElementB;
-      if (currentPlanIndex < 0 || !planHistory[currentPlanIndex]) {
-        alert("Lỗi: Không tìm thấy nội dung lịch trình.");
-        return;
-      }
-      var dest = document.getElementById('dest').value || ((_document$getElementB = document.getElementById('plan-title')) === null || _document$getElementB === void 0 ? void 0 : _document$getElementB.innerText) || "Điểm đến";
-      var planJson = planHistory[currentPlanIndex];
-      sessionStorage.setItem('wander_active_itinerary', JSON.stringify(planJson));
-      sessionStorage.setItem('wander_active_dest', dest);
-      window.location.href = 'navigator.html';
-    });
-  }
-  function resetSaveButton() {
-    btnSaveTrip.disabled = false;
-    btnSaveTrip.innerText = '♥️ Lưu Lịch Trình Này';
-    saveTripStatus.style.display = 'none';
-  }
-
-  // ♥ Hàm lưu reminder vào localStorage và xin quyền thông báo
-  function saveTripReminder(destination, tripDate) {
-    // Lưu vào localStorage
-    var reminders = JSON.parse(localStorage.getItem('wander_reminders') || '[]');
-    var exists = reminders.find(function (r) {
-      return r.tripDate === tripDate && r.destination === destination;
-    });
-    if (!exists) {
-      reminders.push({
-        destination: destination,
-        tripDate: tripDate
-      });
-      localStorage.setItem('wander_reminders', JSON.stringify(reminders));
-    }
-    // Xin quyền thông báo
-    if ('Notification' in window && Notification.permission === 'default') {
-      Notification.requestPermission();
-    }
-  }
-
-  // ♥ Kiểm tra nhắc nhở khi load trang
-  function checkTripReminders() {
-    if (!('Notification' in window) || Notification.permission !== 'granted') return;
-    var reminders = JSON.parse(localStorage.getItem('wander_reminders') || '[]');
-    var today = new Date().toISOString().split('T')[0];
-    reminders.forEach(function (r) {
-      if (r.tripDate === today) {
-        new Notification('🧳 WanderViệt — Hôm nay là ngày đi!', {
-          body: "H\xF4m nay b\u1EA1n c\xF3 chuy\u1EBFn \u0111i \u0111\u1EBFn ".concat(r.destination, ". Ch\xFAc b\u1EA1n l\xEAn \u0111\u01B0\u1EDDng vui v\u1EBB! \uD83C\uDF1F"),
-          icon: '/favicon.ico'
-        });
-      }
-    });
-  }
-  checkTripReminders();
-  function renderVersionTabs() {
-    versionTabs.innerHTML = '';
-    planHistory.forEach(function (_, idx) {
-      var btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'planner-btn';
-      btn.style.padding = '0.4rem 1rem';
-      btn.style.width = 'auto';
-      btn.style.fontSize = '0.9rem';
-      btn.style.borderRadius = '2rem';
-      if (idx === currentPlanIndex) {
-        btn.style.background = 'var(--color-primary, var(--accent))';
-        btn.style.color = '#fff';
-        btn.innerText = idx === 0 ? 'Bản Gốc' : "B\u1EA3n S\u1EEDa ".concat(idx);
-      } else {
-        btn.style.background = 'var(--surface)';
-        btn.style.color = 'var(--text-muted)';
-        btn.style.border = '1px solid var(--border)';
-        btn.innerText = idx === 0 ? 'Bản Gốc' : "B\u1EA3n S\u1EEDa ".concat(idx);
-      }
-      btn.addEventListener('click', function () {
-        currentPlanIndex = idx;
-        var dest = document.getElementById('dest').value;
-        var d = document.getElementById('days').value;
-        renderVersionTabs();
-        renderItinerary(planHistory[idx], dest, d);
-        resetSaveButton();
-      });
-      versionTabs.appendChild(btn);
-    });
-  }
-
-  // ♥ Helper: format ngày VN (VD: Thứ Bảy, 05/04/2026)
-  function formatDayVN(dateStr) {
-    var days = ['Chủ nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
-    var d = new Date(dateStr + 'T00:00:00');
-    var dayName = days[d.getDay()];
-    var dd = String(d.getDate()).padStart(2, '0');
-    var mm = String(d.getMonth() + 1).padStart(2, '0');
-    return "".concat(dayName, ", ").concat(dd, "/").concat(mm, "/").concat(d.getFullYear());
-  }
-  function renderItinerary(plan, destination, days) {
-    var tripDate = arguments.length > 3 && arguments[3] !== undefined ? arguments[3] : null;
-    if (!plan || !plan.itinerary) return;
-    var accomHtml = '';
-    if (plan.accommodationSuggestion) {
-      accomHtml = `
-          <div class="meta-card">
-            <div class="meta-icon-wrapper" style="background: rgba(2, 132, 199, 0.1); color: #0284c7; font-size: 1.2rem;">${plan.accommodationSuggestion.icon}</div>
-            <div class="meta-content">
-              <p>${plan.accommodationSuggestion.typeLabel}</p>
-              <h4>${plan.accommodationSuggestion.nameAndCost}</h4>
-            </div>
-          </div>
-      `;
-    } else {
-      accomHtml = `
-          <div class="meta-card">
-            <div class="meta-icon-wrapper" style="background: rgba(2, 132, 199, 0.1); color: #0284c7;">🏨</div>
-            <div class="meta-content">
-              <p>Đề xuất Lưu trú</p>
-              <h4>${plan.suggestedHotel || 'Tự chọn'}</h4>
-            </div>
-          </div>
-      `;
-    }
-
-    var html = `
-      <div class="timeline-header" style="margin-top: 1rem;">
-        <h2 style="font-size: 1.8rem; color: var(--text); margin-bottom: 0.5rem; line-height: 1.3;">
-          Lịch trình: ${destination} (${days} Ngày)
-        </h2>
-        <p class="timeline-summary">${plan.tripSummary}</p>
+  function renderItinerary(plan, dest, days, date) {
+    const html = `
+      <div class="timeline-header">
+        <h2 class="activity-title" style="font-size: 1.5rem;">Hành trình: ${dest}</h2>
+        <p class="timeline-summary">${plan.summary || ''}</p>
         <div class="timeline-meta">
-          <div class="meta-card">
-            <div class="meta-icon-wrapper" style="background: rgba(16, 185, 129, 0.1); color: #10b981;">💰</div>
-            <div class="meta-content">
-              <p>Dự kiến Chi phí</p>
-              <h4>${plan.estimatedCost}</h4>
-            </div>
-          </div>
-          ${accomHtml}
+          <div class="meta-card"><div class="meta-icon-wrapper">📅</div><div class="meta-content"><p>THỜI GIAN</p><h4>${days} Ngày</h4></div></div>
+          <div class="meta-card"><div class="meta-icon-wrapper">💰</div><div class="meta-content"><p>DỰ KIẾN</p><h4>${plan.totalEstimatedCost || '---'}</h4></div></div>
         </div>
       </div>
+      <div class="timeline-body">
+        ${(plan.itinerary || []).map(day => `
+          <div class="timeline-day">
+            <div class="day-badge">Ngày ${day.day}: ${day.title || ''}</div>
+            <div class="day-activities">
+              ${(day.activities || []).map(act => `
+                <div class="activity-card">
+                  <div class="activity-time">${act.time || '--:--'}</div>
+                  <h4 class="activity-title">${act.activity}</h4>
+                  <p class="activity-location">📍 ${act.location || 'Địa điểm chưa rõ'}</p>
+                  <p class="activity-details">${act.description || ''}</p>
+                  <div class="activity-cost">Dự kiến: ${act.cost || 'Miễn phí'}</div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        `).join('')}
+      </div>
     `;
-    plan.itinerary.forEach(function (dayData, idx) {
-      // ♥ Tính ngày thực tế nếu có tripDate
-      var realDateLabel = '';
-      if (tripDate) {
-        var d = new Date(tripDate + 'T00:00:00');
-        d.setDate(d.getDate() + idx);
-        var dateStr = d.toISOString().split('T')[0];
-        realDateLabel = " \u2014 ".concat(formatDayVN(dateStr));
-      }
-      html += "\n        <div class=\"timeline-day\">\n          <div class=\"day-badge\">Ng\xE0y ".concat(dayData.day.toString().replace(/\s*\(.*\)/, '')).concat(realDateLabel, "</div>\n          <div class=\"day-activities\">\n      ");
-      (dayData.activities || []).forEach(function (act) {
-        html += "\n            <div class=\"activity-card\">\n              <div class=\"activity-time\">".concat(act.time, "</div>\n              <h3 class=\"activity-title\" style=\"margin-top: 0.25rem;\">").concat(act.task, "</h3>\n              <p style=\"color: var(--text-muted); margin-bottom: 0.5rem; font-size: 0.95rem;\">").concat(act.location, "</p>\n              <div class=\"activity-details\" style=\"border-top: 1px dashed var(--border); padding-top: 0.5rem;\">\n                <span style=\"font-size:0.85rem; color:var(--text-muted)\">Chi ph\xED d\u1EF1 ki\u1EBFn</span>\n                <span class=\"activity-cost\">").concat(act.cost, "</span>\n              </div>\n            </div>\n        ");
-      });
-      html += "\n          </div>\n        </div>\n      ";
-    });
-    timelineContent.innerHTML = html;
+    document.getElementById('timelineContent').innerHTML = html;
   }
+
+  function renderVersionTabs() {
+    versionTabs.innerHTML = planHistory.map((p, i) => `
+      <button class="version-tab ${i === currentPlanIndex ? 'active' : ''}" onclick="switchVersion(${i})">Bản ${i + 1}</button>
+    `).join('');
+  }
+
+  window.switchVersion = (idx) => {
+    currentPlanIndex = idx;
+    renderVersionTabs();
+    renderItinerary(planHistory[idx], SmartWizard.data.destination, SmartWizard.data.days, SmartWizard.data.tripDate);
+  };
+
+  refineForm?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const feedback = refineInput.value;
+    if (!feedback) return;
+    loader.style.display = 'flex';
+    try {
+      const res = await fetch('/api/planner/refine', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-auth-token': localStorage.getItem('wander_token') || '' },
+        body: JSON.stringify({ oldPlanJson: planHistory[currentPlanIndex], userFeedback: feedback, itineraryId: currentItineraryId })
+      });
+      const d = await res.json();
+      if (d.success) {
+        planHistory.push(d.plan);
+        currentPlanIndex = planHistory.length - 1;
+        renderVersionTabs();
+        renderItinerary(d.plan, SmartWizard.data.destination, SmartWizard.data.days, SmartWizard.data.tripDate);
+        refineInput.value = '';
+      }
+    } catch(err) { console.error(err); }
+    finally { loader.style.display = 'none'; }
+  });
 });

@@ -1,4 +1,4 @@
-const __oldLog = console.log; console.log = () => { }; require('dotenv').config(); console.log = __oldLog;
+const __oldLog = console.log; console.log = () => {}; require('dotenv').config(); console.log = __oldLog;
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
@@ -20,34 +20,13 @@ app.use(compression()); // Bật nén dữ liệu
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-app.use('/uploads', express.static(path.join(__dirname, 'uploads'), { maxAge: '1d' }));
-// 1. Better Compression (Brotli/Gzip)
-app.use(compression({
-    level: 6,
-    threshold: 1024, // only compress above 1kb
-    filter: (req, res) => {
-        if (req.headers['x-no-compression']) return false;
-        return compression.filter(req, res);
-    }
-}));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// 2. Selective Caching Strategy
+// Force no-cache to fix browser caching old JS files
 app.use((req, res, next) => {
-    const ext = path.extname(req.path).toLowerCase();
-    const isStatic = ['.js', '.css', '.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp', '.woff', '.woff2'].includes(ext);
-
-    if (isStatic) {
-        // Cache static assets for 1 day
-        res.setHeader('Cache-Control', 'public, max-age=86400');
-    } else if (req.path.startsWith('/api/')) {
-        // API responses should never be cached
-        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-        res.setHeader('Pragma', 'no-cache');
-        res.setHeader('Expires', '0');
-    } else {
-        // HTML pages - cache but revalidate
-        res.setHeader('Cache-Control', 'no-cache');
-    }
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
     next();
 });
 
@@ -102,7 +81,7 @@ const startPortals = () => {
         pApp.use('/uploads/', (req, res) => { req.url = '/uploads/' + req.url.replace(/^\//, ''); proxy(req, res); });
         pApp.use(express.static(path.join(__dirname, config.d)));
         pApp.use((req, res) => res.sendFile(path.join(__dirname, config.d, 'index.html')));
-        pApp.listen(config.p).on('error', () => { });
+        pApp.listen(config.p).on('error', () => {});
     });
 };
 
@@ -113,7 +92,7 @@ mongoose.connect(process.env.MONGODB_URI.trim())
         console.log('🛡️ Web Quản Trị:     http://localhost:3001');
         console.log('💼 Web Doanh Nghiệp: http://localhost:3002');
         console.log('✅ MongoDB connected');
-
+        
         app.listen(PORT, '0.0.0.0', () => {
             startPortals();
             initBroadcastWorker(); // Khởi chạy trình gửi thông báo tự động

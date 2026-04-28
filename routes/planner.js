@@ -210,36 +210,43 @@ Quy tắc tuyệt đối:
     const savedDoc = await itinerary.save();
 
     // AI Self-Learning: Extract insights from the generated plan and update user profile
-    if (req.user) {
-      try {
-        const user = await User.findById(req.user.id);
-        if (user) {
-          const insightPrompt = `Analyze this trip plan and extract 2-3 short preferences/habits of this user in Vietnamese. 
-          Return ONLY a JSON object with "insights" array.
-          Plan: ${aiPlanJson.tripSummary}
-          Style: ${req.body.style || ''}
-          Pace: ${req.body.pace || ''}
-          Interests: ${req.body.interests || ''}`;
+    if (req.user && aiPlanJson) {
+      // Chạy ngầm phần này để không làm chậm / lỗi phản hồi chính của người dùng
+      (async () => {
+        try {
+          const user = await User.findById(req.user.id);
+          if (user) {
+            // Đảm bảo preferenceProfile tồn tại
+            if (!user.preferenceProfile) {
+              user.preferenceProfile = { aiInsights: [], lastAnalyzed: new Date() };
+            }
 
-          const insightRes = await groq.chat.completions.create({
-            model: 'llama-3.1-8b-instant',
-            messages: [{ role: 'user', content: insightPrompt }],
-            response_format: { type: 'json_object' }
-          });
-          
-          const insightsData = JSON.parse(insightRes.choices[0].message.content);
-          if (insightsData && Array.isArray(insightsData.insights)) {
-            // Keep unique insights, limit to 20 total
-            const existingInsights = user.preferenceProfile.aiInsights || [];
-            const newInsights = [...new Set([...existingInsights, ...insightsData.insights])].slice(-20);
-            user.preferenceProfile.aiInsights = newInsights;
-            user.preferenceProfile.lastAnalyzed = new Date();
-            await user.save();
+            const insightPrompt = `Analyze this trip plan and extract 2-3 short preferences/habits of this user in Vietnamese. 
+            Return ONLY a JSON object with "insights" array.
+            Plan Summary: ${aiPlanJson.tripSummary || ''}
+            Companion: ${companion || ''}
+            Interests: ${interests || ''}`;
+
+            const insightRes = await groq.chat.completions.create({
+              model: 'llama-3.1-8b-instant',
+              messages: [{ role: 'user', content: insightPrompt }],
+              response_format: { type: 'json_object' }
+            });
+            
+            const insightsData = JSON.parse(insightRes.choices[0].message.content);
+            if (insightsData && Array.isArray(insightsData.insights)) {
+              const existingInsights = user.preferenceProfile.aiInsights || [];
+              const newInsights = [...new Set([...existingInsights, ...insightsData.insights])].slice(-20);
+              user.preferenceProfile.aiInsights = newInsights;
+              user.preferenceProfile.lastAnalyzed = new Date();
+              await user.save();
+              console.log(`✅ Đã cập nhật ${insightsData.insights.length} insight mới cho user ${user.email}`);
+            }
           }
+        } catch (aiErr) {
+          console.warn('⚠️ AI insight extraction failed (Non-critical):', aiErr.message);
         }
-      } catch (aiErr) {
-        console.warn('AI insight extraction failed:', aiErr.message);
-      }
+      })();
     }
 
     res.json({ success: true, plan: aiPlanJson, itineraryId: savedDoc._id });
