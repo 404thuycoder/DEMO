@@ -307,6 +307,24 @@
   let currentAdmin = { role: null };
   let previousTab = 'overview';
   let activeTab = 'overview';
+  let chartPeriods = {
+    distribution: 'all',
+    activity: 'week',
+    users: 'hour',
+    places: 'hour',
+    logs: 'hour'
+  };
+  let chartSelectedYears = {
+    distribution: '2025',
+    activity: '2025',
+    users: '2025',
+    places: '2025'
+  };
+
+  function getActiveChartType(period) {
+    if (period === 'month') return 'line';
+    return 'bar';
+  }
 
   // --- Bootstrap: decide login vs dashboard ---
   if (token) {
@@ -424,7 +442,7 @@
     });
   }
 
-  async function apiFetch(url, options = {}, timeout = 10000) {
+  async function apiFetch(url, options = {}, timeout = 30000) {
     const controller = new AbortController();
     const id = setTimeout(() => controller.abort(), timeout);
     
@@ -562,33 +580,90 @@
       }
 
       setupTabSwitching();
+      setupHubNavigation();
+      setupPeriodFilters();
+      setupAnalyticsEventListeners();
       setupLogout();
       setupBroadcastForm();
       setupAdminCreationForm();
       initThemeCustomizer();
       setupAISentinel();
-      initActivityChart();
+      
+      // Initialize charts with current selector values
+      const currentActivityPeriod = document.getElementById('main-activity-period')?.value || 'day';
+      initActivityChart('line', currentActivityPeriod);
       loadDistributionChart();
+      loadMockCharts();
       loadRankings();
       loadHealthStatus();
 
+      // === KHỞI TẠO: Ẩn tất cả panels, chỉ hiện Tổng quan ===
+      document.querySelectorAll('.admin-panel').forEach(p => {
+        p.classList.add('is-hidden');
+        p.hidden = true;
+      });
+      const overviewPanel = document.getElementById('panel-overview');
+      if (overviewPanel) {
+        overviewPanel.classList.remove('is-hidden');
+        overviewPanel.hidden = false;
+      }
+
       // Load overview data in background
       const refreshAll = () => {
-        loadSystemStats().catch(e => {});
-        initActivityChart().catch(e => {});
-        loadDistributionChart().catch(e => {});
+        const activityPeriod = chartPeriods.activity;
+        const distributionPeriod = chartPeriods.distribution;
+
+        loadSystemStats(activityPeriod).catch(e => {});
+        initActivityChart(getActiveChartType(activityPeriod), activityPeriod).catch(e => {});
+        loadDistributionChart('doughnut', distributionPeriod).catch(e => {});
         loadRankings(currentRankPeriod).catch(e => {});
         loadHealthStatus().catch(e => {});
-        loadLogs('all').catch(e => {});
+        loadLogs('all', getActiveChartType(chartPeriods.logs), chartPeriods.logs).catch(e => {});
         pollActivityStream().catch(e => {});
         
         // Refresh active management tabs for real-time status (SILENT MODE)
-        if (activeTab === 'users') loadUsers(true).catch(e => {});
-        if (activeTab === 'places') loadPlaces(true).catch(e => {});
-        if (activeTab === 'feedbacks') loadFeedbacks(true).catch(e => {});
-        if (activeTab === 'itinerary') loadItineraries(true).catch(e => {});
+        if (activeTab === 'users') loadUsers(true, getActiveChartType(chartPeriods.users), chartPeriods.users).catch(e => {});
+        if (activeTab === 'places') loadPlaces(true, getActiveChartType(chartPeriods.places), chartPeriods.places).catch(e => {});
+        if (activeTab === 'feedbacks') loadFeedbacks(true, 'bar', 'day').catch(e => {});
+        if (activeTab === 'itinerary') loadItineraries(true, 'bar', 'day').catch(e => {});
         if (activeTab === 'moderation') loadModeration(true).catch(e => {});
       };
+
+      // Independent Chart Selectors
+      document.querySelectorAll('.chart-period-select').forEach(select => {
+        select.addEventListener('change', (e) => {
+          const chartId = select.dataset.chart;
+          const period = select.value;
+          chartPeriods[chartId] = period;
+          
+          // Show/Hide Year selector
+          const yearSel = document.querySelector(`.chart-year-select[data-chart="${chartId}"]`);
+          if (yearSel) {
+            yearSel.style.display = (period === 'month') ? 'block' : 'none';
+          }
+
+          if (chartId === 'distribution') loadDistributionChart('doughnut', period, chartSelectedYears[chartId]);
+          else {
+            const chartType = getActiveChartType(period);
+            if (chartId === 'activity') initActivityChart(chartType, period, chartSelectedYears[chartId]);
+            if (chartId === 'users') loadUsers(false, chartType, period, chartSelectedYears[chartId]);
+            if (chartId === 'places') loadPlaces(false, chartId === 'places' ? 'bar' : chartType, period, chartSelectedYears[chartId]);
+          }
+        });
+      });
+
+      // Year Change listeners
+      document.querySelectorAll('.chart-year-select').forEach(select => {
+        select.addEventListener('change', (e) => {
+          const chartId = select.dataset.chart;
+          const year = select.value;
+          chartSelectedYears[chartId] = year;
+          
+          const period = chartPeriods[chartId];
+          if (chartId === 'distribution') loadDistributionChart('doughnut', period, year);
+          else if (chartId === 'activity') initActivityChart(getActiveChartType(period), period, year);
+        });
+      });
 
       // Handle Period Switch
       let currentRankPeriod = 'today';
@@ -601,8 +676,8 @@
         });
       });
 
-      // Handle View More Clicks
-      document.querySelectorAll('.btn-view-more').forEach(btn => {
+      // Handle View More Clicks (Small buttons in header)
+      document.querySelectorAll('.btn-view-more-sm').forEach(btn => {
         btn.addEventListener('click', () => {
           const type = btn.dataset.type;
           openRankingsDrawer(type, currentRankPeriod);
@@ -616,10 +691,10 @@
       }
 
       refreshAll();
-      // Auto refresh every 10 seconds for "real-time" experience
-      setInterval(refreshAll, 10000);
-      // Faster polling for the activity stream ticker
-      setInterval(() => pollActivityStream().catch(e => {}), 5000);
+      // Auto refresh every 60 seconds (prev 10s caused DDOS)
+      setInterval(refreshAll, 60000);
+      // Slower polling for the activity stream ticker to save DB CPU
+      setInterval(() => pollActivityStream().catch(e => {}), 15000);
       
     } catch (e) {
       console.error('Admin bootstrap error:', e);
@@ -639,13 +714,17 @@
     const TAB_TITLES = {
       overview: 'Tổng quan hệ thống',
       moderation: 'Duyệt nội dung',
+      analytics: 'Thống kê & Phân tích',
+      'ai-intelligence': 'Trung tâm Dữ liệu AI',
       users: 'Quản lý người dùng',
       broadcast: 'Gửi thông báo hệ thống',
       logs: 'Nhật ký hệ thống',
       places: 'Kho địa điểm',
-      admins: 'Quản lý Admin',
+      admins: 'Quản trị viên',
       feedbacks: 'Phản hồi người dùng',
-      itineraries: 'Lịch trình AI'
+      itineraries: 'Lịch trình AI',
+      knowledge: 'Dữ liệu AI',
+      rankings: 'Bảng xếp hạng Hiệu suất'
     };
     document.querySelectorAll('[data-admin-tab]').forEach(btn => {
       btn.addEventListener('click', async () => {
@@ -672,8 +751,11 @@
         // Close any ranking popups
         if (typeof closeRankingsDrawer === 'function') closeRankingsDrawer();
 
-        // Hide ALL panels
-        document.querySelectorAll('.admin-panel').forEach(p => p.classList.add('is-hidden'));
+        // Hide ALL panels (cả attribute và class để đảm bảo ẩn hoàn toàn)
+        document.querySelectorAll('.admin-panel').forEach(p => {
+          p.classList.add('is-hidden');
+          p.hidden = true;
+        });
         document.querySelectorAll('.sidebar-btn').forEach(b => b.classList.remove('is-active'));
         
         // Find and activate the correct sidebar button (in case click came from quick action)
@@ -709,37 +791,120 @@
 
           panel.classList.remove('is-hidden');
           panel.hidden = false;
-          if (tab !== 'overview') {
-            let titleEl = panel.querySelector('.panel-page-title');
-            if (!titleEl) {
-              titleEl = document.createElement('div');
-              titleEl.className = 'panel-page-title';
-              panel.insertBefore(titleEl, panel.firstChild);
-            }
-            titleEl.innerHTML = `<h1 class="main-title">${TAB_TITLES[tab] || tab}</h1>`;
-          }
+          // Panel đã có tiêu đề riêng trong HTML, không cần inject thêm
           
+          // Auto-initialize default sub-tab for certain panels
+          if (tab === 'overview') {
+            const defaultHubBtn = panel.querySelector('.hub-btn[data-hub-tab="overview-stats"]');
+            if (defaultHubBtn) defaultHubBtn.click();
+          } else if (tab === 'users') {
+            const defaultHubBtn = panel.querySelector('.hub-btn[data-hub-tab="users-list"]');
+            if (defaultHubBtn) defaultHubBtn.click();
+          } else if (tab === 'ai-intelligence') {
+            const defaultHubBtn = panel.querySelector('.hub-btn[data-hub-tab="ai-dashboard"]');
+            if (defaultHubBtn) defaultHubBtn.click();
+          } else if (tab === 'analytics') {
+            const defaultHubBtn = panel.querySelector('.hub-btn[data-hub-tab="analytics-system"]');
+            if (defaultHubBtn) defaultHubBtn.click();
+          }
+
           switch (tab) {
             case 'overview': 
               await loadSystemStats(); 
+              loadRankings();
+              loadLogs('all');
+              pollActivityStream();
+              break;
+            case 'analytics':
+              await loadSystemStats();
               initActivityChart();
+              loadDistributionChart();
+              loadMockCharts();
+              loadRankings();
               break;
             case 'users': await loadUsers(); break;
             case 'places': await loadPlaces(); break;
             case 'feedbacks': await loadFeedbacks(); break;
             case 'itineraries': await loadItineraries(); break;
-            case 'knowledge':
-        loadKnowledge().catch(e => {});
-        break;
-      case 'ai-intelligence':
-        loadAIIntel().catch(e => {});
-        break;
-      case 'logs':
- await loadLogs('all'); break;
+            case 'knowledge': loadKnowledge().catch(e => {}); break;
+            case 'ai-intelligence': loadAIIntel().catch(e => {}); break;
+            case 'logs': await loadLogs('all'); break;
             case 'moderation': await loadModeration(); break;
+            case 'admins': // Add this if needed
+              break;
             case 'broadcast':
               if (typeof setupBroadcastForm === 'function') setupBroadcastForm();
               break;
+          }
+        }
+      });
+    });
+  }
+
+  /**
+   * NEW: Hub Navigation (Sub-tabs within panels)
+   */
+  function setupHubNavigation() {
+    document.querySelectorAll('[data-hub-tab]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const targetSubId = 'sub-panel-' + btn.dataset.hubTab;
+        const parentPanelId = 'panel-' + btn.dataset.parentPanel;
+        const parentPanel = document.getElementById(parentPanelId);
+        
+        if (!parentPanel) return;
+
+        // 1. Update Buttons
+        parentPanel.querySelectorAll('.hub-btn').forEach(b => b.classList.remove('is-active'));
+        btn.classList.add('is-active');
+
+        // 2. Update Sub-panels
+        parentPanel.querySelectorAll('.sub-panel').forEach(sp => {
+          sp.classList.add('is-hidden');
+        });
+
+        const targetSub = document.getElementById(targetSubId);
+        if (targetSub) {
+          targetSub.classList.remove('is-hidden');
+          
+          // Trigger specific re-renders if needed (e.g. charts)
+          const hubTab = btn.dataset.hubTab;
+          if (hubTab.includes('overview')) {
+            if (hubTab === 'overview-ranking') loadRankings().catch(e => {});
+          }
+
+          if (hubTab.includes('analytics')) {
+            // Load data if switching to specific analytics tab
+            if (hubTab === 'analytics-system') {
+               const p = document.getElementById('main-activity-period')?.value || 'day';
+               initActivityChart('line', p).catch(e => {});
+               loadDistributionChart().catch(e => {});
+               loadMockCharts();
+            }
+            if (hubTab === 'analytics-users') {
+               const p = document.querySelector('.chart-period-select[data-chart="users"]')?.value || 'day';
+               loadUsers(false, 'line', p).catch(e => {});
+            }
+            if (hubTab === 'analytics-places') {
+               const p = document.querySelector('.chart-period-select[data-chart="places"]')?.value || 'day';
+               loadPlaces(false, 'line', p).catch(e => {});
+            }
+            if (hubTab === 'analytics-logs') loadLogs('all').catch(e => {});
+            if (hubTab === 'analytics-ai') {
+               const p = document.querySelector('.chart-period-select[data-chart="ai"]')?.value || 'day';
+               loadAIIntel(false, 'line', p).catch(e => {});
+            }
+
+            // Wait for panel to show before resizing charts
+            setTimeout(() => {
+              if (window.activityChart) window.activityChart.resize();
+              if (window.distributionChart) window.distributionChart.resize();
+              if (window.sentimentChartInstance) window.sentimentChartInstance.resize();
+              if (window.deviceChartInstance) window.deviceChartInstance.resize();
+              if (window.userManagerChart) window.userManagerChart.resize();
+              if (window.placeManagerChart) window.placeManagerChart.resize();
+              if (window.logManagerChart) window.logManagerChart.resize();
+              if (window.aiTrendChartInstance) window.aiTrendChartInstance.resize();
+            }, 50);
           }
         }
       });
@@ -780,9 +945,9 @@
     }, stepTime);
   }
 
-  async function loadSystemStats() {
+  async function loadSystemStats(period = 'day') {
     try {
-      const json = await apiFetch('/api/admin/stats');
+      const json = await apiFetch(`/api/admin/stats?period=${period}`);
       if (json.success && json.data) {
         const data = json.data;
         
@@ -853,256 +1018,332 @@
 
   let activityChart = null;
   let distributionChart = null;
-  async function initActivityChart() {
-    const ctx = document.getElementById('activityChart');
-    if (!ctx) return;
 
-    try {
-      const json = await apiFetch('/api/admin/stats/trend');
-      if (!json.success || !json.data) return;
-      
-      const trendData = json.data;
-      const labels = trendData.map(d => d.label.split('-').slice(2).join('/'));
-      const interactions = trendData.map(d => d.interactions);
-      const users = trendData.map(d => d.users || 0);
-      const businesses = trendData.map(d => d.businesses || 0);
-      const admins = trendData.map(d => d.admins || 0);
-      const places = trendData.map(d => d.places || 0);
-      const feedbacks = trendData.map(d => d.feedbacks || 0);
+  /* === WANDER CHART FACTORY 2.0 === */
+  const WanderChartFactory = {
+    defaults: {
+      font: { family: "'Be Vietnam Pro', sans-serif", size: 12 },
+      color: '#94a3b8',
+      gridColor: 'rgba(255, 255, 255, 0.03)'
+    },
 
-      if (activityChart) activityChart.destroy();
-      activityChart = new Chart(ctx, {
+    createGradient(ctx, color, height = 400) {
+      const grad = ctx.createLinearGradient(0, 0, 0, height);
+      grad.addColorStop(0, color + '44');
+      grad.addColorStop(1, color + '00');
+      return grad;
+    },
+
+    line(ctx, labels, datasets, options = {}) {
+      return new Chart(ctx, {
         type: 'line',
-        data: {
-          labels: labels,
-          datasets: [
-            {
-              label: 'Người dùng mới',
-              data: users,
-              borderColor: '#6366f1',
-              backgroundColor: 'transparent',
-              tension: 0.4,
-              borderWidth: 3,
-              pointRadius: 4
-            },
-            {
-              label: 'Doanh nghiệp mới',
-              data: businesses,
-              borderColor: '#10b981',
-              backgroundColor: 'transparent',
-              tension: 0.4,
-              borderWidth: 3,
-              pointRadius: 4
-            },
-            {
-              label: 'Admin mới',
-              data: admins,
-              borderColor: '#8b5cf6', // Purple
-              backgroundColor: 'transparent',
-              tension: 0.4,
-              borderWidth: 3,
-              pointRadius: 4
-            },
-            {
-              label: 'Địa điểm mới',
-              data: places,
-              borderColor: '#f59e0b',
-              backgroundColor: 'transparent',
-              tension: 0.4,
-              borderWidth: 2,
-              pointRadius: 3
-            },
-            {
-              label: 'Phản hồi mới',
-              data: feedbacks,
-              borderColor: '#ef4444',
-              backgroundColor: 'transparent',
-              tension: 0.4,
-              borderWidth: 2,
-              pointRadius: 3
-            },
-            {
-              label: 'Tương tác',
-              data: interactions,
-              borderColor: 'rgba(255, 255, 255, 0.15)',
-              borderDash: [5, 5],
-              backgroundColor: 'transparent',
-              tension: 0.4,
-              borderWidth: 1,
-              pointRadius: 0
-            }
-          ]
-        },
+        data: { labels, datasets },
         options: {
           responsive: true,
           maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          animation: {
+            duration: 2000,
+            easing: 'easeInOutQuart'
+          },
           plugins: {
             legend: {
               display: true,
               position: 'top',
-              labels: { color: '#94a3b8', font: { size: 10, family: 'Be Vietnam Pro' }, usePointStyle: true, padding: 15 }
+              align: 'end',
+              labels: { color: this.defaults.color, font: { weight: '600' }, usePointStyle: true, padding: 20 }
             },
-            tooltip: { mode: 'index', intersect: false }
+            tooltip: {
+              backgroundColor: 'rgba(15, 23, 42, 0.9)',
+              backdropFilter: 'blur(8px)',
+              padding: 12,
+              cornerRadius: 12,
+              borderColor: 'rgba(255,255,255,0.1)',
+              borderWidth: 1,
+              titleFont: { size: 14, weight: '700' },
+              bodyFont: { size: 13 },
+              usePointStyle: true,
+              boxPadding: 6
+            }
           },
           scales: {
             y: {
               beginAtZero: true,
-              grid: { color: 'rgba(255, 255, 255, 0.05)', drawBorder: false },
-              ticks: { color: '#64748b', font: { size: 10 } }
+              grid: { color: this.defaults.gridColor, drawBorder: false },
+              ticks: { color: this.defaults.color, padding: 10 }
             },
             x: {
               grid: { display: false },
-              ticks: { color: '#64748b', font: { size: 10 } }
+              ticks: { color: this.defaults.color, padding: 10 }
             }
-          }
+          },
+          ...options
         }
       });
-    } catch (err) {
-      console.warn('Failed to load activity trend chart:', err);
-    }
-  }
+    },
 
-  async function loadDistributionChart() {
-    const ctx = document.getElementById('distributionChart')?.getContext('2d');
-    if (!ctx) return;
-
-    try {
-      const json = await apiFetch('/api/admin/stats/distribution');
-      if (!json.success) return;
-
-      const roles = json.data.roles;
-      const labels = roles.map(r => {
-        if (r._id === 'user') return 'Khách hàng';
-        if (r._id === 'business') return 'Doanh nghiệp';
-        if (r._id === 'admin') return 'Quản trị viên';
-        return r._id;
-      });
-      const values = roles.map(r => r.count);
-
-      // Thêm Thành viên mới vào biểu đồ nếu có
-      if (json.data.newMembers > 0) {
-        labels.push('Thành viên mới (Hôm nay)');
-        values.push(json.data.newMembers);
-      }
-
-      if (distributionChart) distributionChart.destroy();
-      distributionChart = new Chart(ctx, {
+    donut(ctx, labels, data, colors, options = {}) {
+      return new Chart(ctx, {
         type: 'doughnut',
         data: {
-          labels: labels,
+          labels,
           datasets: [{
-            data: values,
-            backgroundColor: ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#4ade80'],
+            data,
+            backgroundColor: colors,
             borderWidth: 0,
-            hoverOffset: 12
+            hoverOffset: 20,
+            borderRadius: 8,
+            spacing: 5
           }]
         },
         options: {
           responsive: true,
           maintainAspectRatio: false,
-          cutout: '72%',
+          cutout: '75%',
+          animation: { animateRotate: true, animateScale: true, duration: 1500 },
           plugins: {
             legend: {
               position: 'bottom',
-              labels: { color: '#94a3b8', padding: 25, font: { size: 11, family: 'Be Vietnam Pro' }, usePointStyle: true }
+              labels: { color: this.defaults.color, padding: 20, font: { weight: '600', size: 10 }, usePointStyle: true }
+            },
+            tooltip: {
+              backgroundColor: 'rgba(15, 23, 42, 0.9)',
+              padding: 10,
+              cornerRadius: 10,
+              displayColors: false
             }
-          }
+          },
+          ...options
         }
       });
+    },
+
+    bar(ctx, labels, data, colors, options = {}) {
+      return new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [{
+            data,
+            backgroundColor: colors,
+            borderRadius: 8,
+            barThickness: 20
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            y: { grid: { color: this.defaults.gridColor, drawBorder: false }, ticks: { color: this.defaults.color, font: { size: 10 } } },
+            x: { grid: { display: false }, ticks: { color: this.defaults.color, font: { size: 10 } } }
+          },
+          ...options
+        }
+      });
+    }
+  };
+
+  async function initActivityChart(chartType = 'line', period = 'day', year = null) {
+    const ctx = document.getElementById('activityChart');
+    if (!ctx) return;
+    try {
+      let url = `/api/admin/stats/trend?period=${period}`;
+      if (year) url += `&year=${year}`;
+      const json = await apiFetch(url);
+      if (!json.success || !json.data) return;
+      
+      const trendData = json.data;
+      let labels = trendData.map(d => {
+        if (period === 'hour') {
+          const parts = d.label.split(':');
+          let h = parts.length >= 2 ? parts[1] : d.label;
+          return (h.length === 1 ? '0' + h : h) + ':00';
+        } else if (period === 'week') {
+          const date = new Date(d.label);
+          const dayNames = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
+          return isNaN(date) ? d.label : `${dayNames[date.getDay()]} ${date.getDate()}/${date.getMonth()+1}`;
+        } else if (period === 'month') {
+          const parts = d.label.split('-');
+          return parts.length >= 2 ? `Tháng ${parts[1]}` : d.label;
+        } else if (period === 'year') return `Năm ${d.label}`;
+        const parts = d.label.split('-');
+        return parts.length >= 3 ? `${parts[2]}/${parts[1]}` : d.label;
+      });
+
+      const users = trendData.map(d => d.users || 0);
+      const businesses = trendData.map(d => d.businesses || 0);
+      const admins = trendData.map(d => d.admins || 0);
+
+      if (activityChart) activityChart.destroy();
+      
+      const canvasCtx = ctx.getContext('2d');
+      activityChart = WanderChartFactory.line(ctx, labels, [
+        {
+          label: 'Người dùng',
+          data: users,
+          borderColor: '#6366f1',
+          backgroundColor: WanderChartFactory.createGradient(canvasCtx, '#6366f1'),
+          tension: 0.4,
+          borderWidth: 4,
+          pointRadius: 0,
+          pointHoverRadius: 8,
+          pointBackgroundColor: '#6366f1',
+          pointBorderColor: '#fff',
+          pointBorderWidth: 2,
+          fill: true
+        },
+        {
+          label: 'Doanh nghiệp',
+          data: businesses,
+          borderColor: '#10b981',
+          backgroundColor: WanderChartFactory.createGradient(canvasCtx, '#10b981'),
+          tension: 0.4,
+          borderWidth: 4,
+          pointRadius: 0,
+          pointHoverRadius: 8,
+          pointBackgroundColor: '#10b981',
+          pointBorderColor: '#fff',
+          pointBorderWidth: 2,
+          fill: true
+        },
+        {
+          label: 'Admin',
+          data: admins,
+          borderColor: '#f59e0b',
+          backgroundColor: WanderChartFactory.createGradient(canvasCtx, '#f59e0b'),
+          tension: 0.4,
+          borderWidth: 4,
+          pointRadius: 0,
+          pointHoverRadius: 8,
+          pointBackgroundColor: '#f59e0b',
+          pointBorderColor: '#fff',
+          pointBorderWidth: 2,
+          fill: true
+        }
+      ]);
+      window.activityChart = activityChart;
     } catch (err) {
-      console.warn('Failed to load distribution chart:', err);
+      console.warn('WanderCharts Error [Activity]:', err);
     }
   }
 
+  async function loadDistributionChart(chartType = 'bar', period = 'all', year = null) {
+    const ctx = document.getElementById('distributionChart')?.getContext('2d');
+    if (!ctx) return;
+    try {
+      let url = `/api/admin/stats/distribution?period=${period}`;
+      if (year) url += `&year=${year}`;
+      const json = await apiFetch(url);
+      if (!json.success) return;
+
+      const rolesData = json.data.roles || json.data; // Handle both cases just in case
+      const labels = rolesData.map(r => {
+        const names = { 'user': 'Thành viên', 'business': 'Đối tác', 'admin': 'Quản trị viên' };
+        return names[r._id] || r._id;
+      });
+      const values = rolesData.map(r => r.count);
+
+      if (distributionChart) distributionChart.destroy();
+      distributionChart = WanderChartFactory.donut(ctx, labels, values, ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6']);
+      window.distributionChart = distributionChart;
+    } catch (err) {
+      console.warn('WanderCharts Error [Distribution]:', err);
+    }
+  }
+
+  let sentimentChartInstance, deviceChartInstance;
   async function loadRankings(period = 'alltime') {
     try {
       const json = await apiFetch(`/api/admin/stats/rankings?period=${period}&t=${Date.now()}`);
       if (!json.success) return;
 
-      const { topActive, topItineraries, topDeposits, topBusinesses, topPlaces } = json.data;
+      const data = json.data || {};
+      const topActive = data.topActive || [];
+      const topItineraries = data.topItineraries || [];
+      const topDeposits = data.topDeposits || [];
+      const topBusinesses = data.topBusinesses || [];
+      const topPlaces = data.topPlaces || [];
+      
       const getMedal = (idx) => idx === 0 ? '<span class="medal">🥇</span>' : (idx === 1 ? '<span class="medal">🥈</span>' : (idx === 2 ? '<span class="medal">🥉</span>' : `<span class="rank-num">#${idx + 1}</span>`));
+      const emptyHTML = '<div class="rank-empty-state"><span>📭</span><p>Chưa có dữ liệu</p></div>';
 
-      // 1. Top Active (Minutes)
-      const activeList = document.getElementById('rank-active-list');
-      if (activeList) {
-        activeList.innerHTML = topActive.map((u, idx) => `
-          <div class="rank-item-v2">
-            <div class="rank-num">${getMedal(idx)}</div>
-            <img src="${u.avatar || ''}" class="rank-avatar" onerror="this.onerror=null; this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(u.displayName || u.name || 'U')}&background=random&color=fff'">
-            <div class="rank-info">
-              <div class="rank-name">${u.displayName || u.name}</div>
-              <div class="rank-meta">${u.email}</div>
-            </div>
-            <div class="rank-badge">${Math.floor(u.minutes || 0)} <small>phút</small></div>
-          </div>
-        `).join('') || '<div class="empty-state">Chưa có dữ liệu</div>';
-      }
+      const renderList = (elementId, items, type) => {
+        const el = document.getElementById(elementId);
+        if (!el) return;
+        if (!items.length) { el.innerHTML = emptyHTML; return; }
+        
+        el.innerHTML = items.map((u, idx) => {
+          let badgeClass = 'rank-badge--silver';
+          let unit = '';
+          let val = 0;
+          
+          if (type === 'active') { badgeClass = ''; unit = 'phút'; val = Math.floor(u.minutes || 0); }
+          else if (type === 'itinerary') { badgeClass = 'rank-badge--silver'; unit = 'lịch trình'; val = u.count || 0; }
+          else if (type === 'deposit') { badgeClass = 'rank-badge--gold'; unit = 'VNĐ'; val = (u.totalSpent || 0).toLocaleString(); }
+          else if (type === 'business') { badgeClass = 'rank-badge--gold'; unit = 'XP'; val = (u.score || 0).toLocaleString(); }
+          else if (type === 'place') { badgeClass = 'rank-badge--blue'; unit = 'thích'; val = (u.favoritesCount || 0).toLocaleString(); }
 
-      // 2. Top Itineraries (Saved Trips)
-      const expList = document.getElementById('rank-experience-list');
-      if (expList) {
-        expList.innerHTML = topItineraries.map((u, idx) => `
-          <div class="rank-item-v2">
-            <div class="rank-num">${getMedal(idx)}</div>
-            <img src="${u.avatar || ''}" class="rank-avatar" onerror="this.onerror=null; this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(u.displayName || u.name || 'U')}&background=random&color=fff'">
-            <div class="rank-info">
-              <div class="rank-name">${u.displayName || u.name}</div>
-              <div class="rank-meta">${u.email}</div>
-            </div>
-            <div class="rank-badge rank-badge--silver">${(u.count || 0)} <small>lịch trình</small></div>
-          </div>
-        `).join('') || '<div class="empty-state">Chưa có dữ liệu</div>';
-      }
+          const avatar = u.avatar || u.image || '';
+          const name = u.displayName || u.name || u.title || 'Unknown';
+          const meta = u.email || u.region || '';
 
-      // 3. Top Deposits
-      const depList = document.getElementById('rank-deposits-list');
-      if (depList) {
-        depList.innerHTML = topDeposits.map((u, idx) => `
-          <div class="rank-item-v2">
-            <div class="rank-num">${getMedal(idx)}</div>
-            <img src="${u.avatar || ''}" class="rank-avatar" onerror="this.onerror=null; this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(u.displayName || u.name || 'U')}&background=random&color=fff'">
-            <div class="rank-info">
-              <div class="rank-name">${u.displayName || u.name}</div>
-              <div class="rank-meta">${u.email}</div>
-            </div>
-            <div class="rank-badge rank-badge--gold">${(u.totalSpent || 0).toLocaleString()} <small>VNĐ</small></div>
-          </div>
-        `).join('') || '<div class="empty-state">Chưa có dữ liệu</div>';
-      }
-
-      // 4. Top Businesses
-      const bizList = document.getElementById('rank-businesses-list');
-      if (bizList) {
-        bizList.innerHTML = topBusinesses.map((b, idx) => `
+          return `
             <div class="rank-item-v2">
               <div class="rank-num">${getMedal(idx)}</div>
-              <img src="${b.avatar || ''}" class="rank-avatar" onerror="this.onerror=null; this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(b.displayName || b.name || 'B')}&background=random&color=fff'">
+              <img src="${avatar}" class="${type === 'place' ? 'rank-img-min' : 'rank-avatar'}" onerror="this.onerror=null; this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random&color=fff'">
               <div class="rank-info">
-                <div class="rank-name">${b.displayName || b.name}</div>
-                <div class="rank-meta">${b.email}</div>
+                <div class="rank-name">${name}</div>
+                <div class="rank-meta">${meta}</div>
               </div>
-              <div class="rank-badge rank-badge--gold">${(b.score || 0).toLocaleString()} <small>XP</small></div>
+              <div class="rank-badge ${badgeClass}">${val} <small>${unit}</small></div>
             </div>
-          `).join('') || '<div class="empty-state">Chưa có dữ liệu</div>';
-      }
+          `;
+        }).join('');
+      };
 
-      // 5. Top Places
-      const placeList = document.getElementById('rank-places-list');
-      if (placeList) {
-        placeList.innerHTML = topPlaces.map((p, idx) => `
-          <div class="rank-item-v2">
-            <div class="rank-num">${getMedal(idx)}</div>
-            <img src="${p.image || ''}" class="rank-img-min">
-            <div class="rank-info">
-              <div class="rank-name">${p.name}</div>
-              <div class="rank-meta">${p.region}</div>
-            </div>
-            <div class="rank-badge rank-badge--blue">${(p.favoritesCount || 0).toLocaleString()} <small>thích</small></div>
-          </div>
-        `).join('') || '<div class="empty-state">Chưa có dữ liệu</div>';
-      }
+      // Populate Lists
+      renderList('rank-active-list', topActive, 'active');
+      renderList('rank-experience-list', topItineraries, 'itinerary');
+      renderList('rank-deposits-list', topDeposits, 'deposit');
+      renderList('rank-businesses-list', topBusinesses, 'business');
+      renderList('rank-places-list', topPlaces, 'place');
 
-    } catch (e) { console.warn('Leaderboard error:', e); }
+    } catch (e) { 
+      console.error('Rankings load error:', e); 
+      const errorHTML = `<div class="rank-empty-state"><span>⚠️</span><p>Lỗi tải dữ liệu. Vui lòng thử lại.</p><p style="font-size:0.7rem;color:red;">${e.message}</p></div>`;
+      ['rank-active-list', 'rank-experience-list', 'rank-deposits-list', 'rank-businesses-list', 'rank-places-list'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.innerHTML = errorHTML;
+      });
+    }
+  }
+
+  function loadMockCharts() {
+    // 1. Sentiment Chart (Bar)
+    const ctx1 = document.getElementById('sentimentChart')?.getContext('2d');
+    if (ctx1) {
+        if (sentimentChartInstance) sentimentChartInstance.destroy();
+        sentimentChartInstance = WanderChartFactory.bar(ctx1, 
+            ['Rất tệ', 'Tệ', 'Bình thường', 'Tốt', 'Rất tốt'],
+            [5, 10, 25, 45, 15],
+            ['#ef4444', '#f59e0b', '#64748b', '#10b981', '#6366f1']
+        );
+    }
+
+    // 2. Device Chart (Doughnut)
+    const ctx2 = document.getElementById('deviceChart')?.getContext('2d');
+    if (ctx2) {
+        if (deviceChartInstance) deviceChartInstance.destroy();
+        deviceChartInstance = WanderChartFactory.donut(ctx2,
+            ['Mobile', 'Desktop', 'Tablet'],
+            [65, 30, 5],
+            ['#6366f1', '#10b981', '#f59e0b']
+        );
+    }
+    
+    // Note: Period selector listeners are now moved to a central initialization block
+    // to avoid multiple event bindings.
   }
 
   async function loadHealthStatus() {
@@ -1120,7 +1361,7 @@
   }
 
   // --- Users ---
-  async function loadUsers(silent = false) {
+  async function loadUsers(silent = false, chartType = 'line', period = 'day') {
     // Ghi nhớ những hàng chi tiết đang mở để mở lại sau khi render
     const openDetailIds = Array.from(document.querySelectorAll('.detail-row.is-open')).map(el => el.id);
     
@@ -1129,11 +1370,11 @@
     }
     
     try {
-      const json = await apiFetch('/api/admin/users?t=' + Date.now());
+      const json = await apiFetch(`/api/admin/users?period=${period}&t=${Date.now()}`);
       if (json.success) {
         usersData = json.data;
         renderUsers(usersData);
-        updateUserManagerDashboard(usersData);
+        updateUserManagerDashboard(usersData, chartType);
         
         // Khôi phục trạng thái mở của các hàng chi tiết
         openDetailIds.forEach(id => {
@@ -1147,7 +1388,7 @@
   }
 
   let userManagerChart = null;
-  function updateUserManagerDashboard(users) {
+  function updateUserManagerDashboard(users, chartType = 'bar') {
     const dashboard = document.getElementById('user-manager-dashboard');
     if (!dashboard) return;
     
@@ -1177,27 +1418,15 @@
       const adminCount = users.filter(u => u.isAdmin || u.isSuperAdmin).length;
       const normalCount = total - businesses - adminCount;
 
-      userManagerChart = new Chart(ctx, {
-        type: 'bar',
-        data: {
-          labels: ['Khách hàng', 'Doanh nghiệp', 'Admin'],
-          datasets: [{
-            label: 'Số lượng',
-            data: [normalCount, businesses, adminCount],
-            backgroundColor: ['#38bdf8', '#10b981', '#f59e0b'],
-            borderRadius: 6
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: { legend: { display: false } },
-          scales: {
-            y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)', drawBorder: false }, ticks: { color: '#94a3b8' } },
-            x: { grid: { display: false }, ticks: { color: '#94a3b8' } }
-          }
-        }
-      });
+      const isDonut = chartType === 'doughnut';
+      const isArea = chartType === 'area';
+      const finalChartType = isArea ? 'line' : (isDonut ? 'doughnut' : (chartType || 'bar'));
+
+      if (isDonut) {
+        userManagerChart = WanderChartFactory.donut(ctx, ['Khách hàng', 'Doanh nghiệp', 'Admin'], [normalCount, businesses, adminCount], ['#6366f1', '#10b981', '#f59e0b']);
+      } else {
+        userManagerChart = WanderChartFactory.bar(ctx, ['Khách hàng', 'Doanh nghiệp', 'Admin'], [normalCount, businesses, adminCount], ['#6366f1', '#10b981', '#f59e0b']);
+      }
     }
   }
 
@@ -1317,6 +1546,22 @@
                         style="margin-top:0.5rem; width:100%; max-width:220px; display:flex; justify-content:center; align-items:center; gap:0.5rem">
                   📜 Xem lịch sử hoạt động
                 </button>
+                <button class="btn btn--small" 
+                        data-reset-password="${u._id}"
+                        data-portal="${u.role === 'business' ? 'business' : (['admin', 'superadmin'].includes(u.role) ? 'admin' : 'user')}"
+                        style="margin-top:0.5rem; width:100%; max-width:220px; display:flex; justify-content:center; align-items:center; gap:0.5rem; background:rgba(245,158,11,0.1); color:#f59e0b; border:1px solid rgba(245,158,11,0.2)">
+                  🔑 Đặt lại mật khẩu
+                </button>
+                <button class="btn btn--small" 
+                        onclick="WanderAdmin.contactUser('${u._id}', '${(u.displayName || u.name || '').replace(/'/g, "\\'")}')"
+                        style="margin-top:0.5rem; width:100%; max-width:220px; display:flex; justify-content:center; align-items:center; gap:0.5rem; background:rgba(56,189,248,0.1); color:#38bdf8; border:1px solid rgba(56,189,248,0.2)">
+                  💬 Liên hệ trực tiếp
+                </button>
+                <button class="btn btn--small" 
+                        onclick="WanderAdmin.sendResetEmail('${u._id}', '${u.role === 'business' ? 'business' : (['admin', 'superadmin'].includes(u.role) ? 'admin' : 'user')}')"
+                        style="margin-top:0.5rem; width:100%; max-width:220px; display:flex; justify-content:center; align-items:center; gap:0.5rem; background:rgba(99,102,241,0.1); color:#818cf8; border:1px solid rgba(99,102,241,0.2)">
+                  ✉️ Gửi Email đặt lại MK
+                </button>
                 
                 <div style="margin-top:0.5rem">
                    <img src="${u.avatar || ''}" 
@@ -1346,6 +1591,13 @@
         if (editBtn) {
           const user = usersData.find(x => x._id === editBtn.dataset.editUser);
           if (user) openUserModal(user);
+          return;
+        }
+        const resetPassBtn = e.target.closest('[data-reset-password]');
+        if (resetPassBtn) {
+          const id = resetPassBtn.dataset.resetPassword;
+          const portal = resetPassBtn.dataset.portal || 'user';
+          WanderAdmin.resetUserPassword(id, portal);
           return;
         }
         const deleteRowBtn = e.target.closest('[data-delete-user-row]');
@@ -1438,7 +1690,9 @@
         (u.email && u.email.toLowerCase().includes(q)) ||
         (u.displayName && u.displayName.toLowerCase().includes(q));
       const matchRole = currentRoleFilter === 'all' || u.role === currentRoleFilter;
-      return matchSearch && matchRole;
+      const statusFilter = document.getElementById('user-status-filter')?.value || 'all';
+      const matchStatus = statusFilter === 'all' || u.status === statusFilter;
+      return matchSearch && matchRole && matchStatus;
     });
     renderUsers(filtered);
     const label = document.getElementById('user-count-label');
@@ -1543,7 +1797,7 @@
 
 
   // --- Places ---
-  async function loadPlaces(silent = false) {
+  async function loadPlaces(silent = false, chartType = 'line', period = 'day') {
     const openDetailIds = Array.from(document.querySelectorAll('.detail-row.is-open')).map(el => el.id);
     
     if (!silent) {
@@ -1551,11 +1805,11 @@
     }
     
     try {
-      const json = await apiFetch('/api/admin/places?t=' + Date.now());
+      const json = await apiFetch(`/api/admin/places?period=${period}&t=${Date.now()}`);
       if (json.success) {
         placesData = json.data;
         renderPlaces(placesData);
-        updatePlaceDashboard(placesData);
+        updatePlaceManagerDashboard(placesData, chartType);
         
         openDetailIds.forEach(id => {
           const row = document.getElementById(id);
@@ -1568,44 +1822,25 @@
   }
 
   let placeManagerChart = null;
-  function updatePlaceDashboard(places) {
+  function updatePlaceManagerDashboard(places, chartType = 'doughnut') {
     const dashboard = document.getElementById('place-manager-dashboard');
     if (!dashboard) return;
     dashboard.style.display = 'block';
 
-    const total = places.length;
-    const top = places.filter(p => p.top).length;
-    const verified = places.filter(p => p.verified).length;
-    const regions = [...new Set(places.map(p => p.region).filter(Boolean))].length;
-
-    document.getElementById('pm-total-places').textContent = total;
-    document.getElementById('pm-top-places').textContent = top;
-    document.getElementById('pm-verified').textContent = verified;
-    document.getElementById('pm-regions').textContent = regions;
-
+    const placesCount = places.filter(p => p.kind === 'diem-du-lich').length;
+    const servicesCount = places.length - placesCount;
     const ctx = document.getElementById('placeManagerChart')?.getContext('2d');
     if (ctx) {
-      if (placeManagerChart) placeManagerChart.destroy();
-      const budget1 = places.filter(p => p.budget == 1).length;
-      const budget2 = places.filter(p => p.budget == 2).length;
-      const budget3 = places.filter(p => p.budget == 3).length;
+      const isDonut = chartType === 'doughnut';
+      const isArea = chartType === 'area';
+      const finalChartType = isArea ? 'line' : (isDonut ? 'doughnut' : (chartType || 'bar'));
 
-      placeManagerChart = new Chart(ctx, {
-        type: 'doughnut',
-        data: {
-          labels: ['Tiết kiệm', 'Vừa phải', 'Cao cấp'],
-          datasets: [{
-            data: [budget1, budget2, budget3],
-            backgroundColor: ['#10b981', '#38bdf8', '#f59e0b'],
-            borderWidth: 0
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: { legend: { position: 'right', labels: { color: '#94a3b8' } } }
-        }
-      });
+      if (placeManagerChart) placeManagerChart.destroy();
+      if (isDonut) {
+        placeManagerChart = WanderChartFactory.donut(ctx, ['Địa điểm', 'Dịch vụ'], [placesCount, servicesCount], ['#6366f1', '#10b981']);
+      } else {
+        placeManagerChart = WanderChartFactory.bar(ctx, ['Địa điểm', 'Dịch vụ'], [placesCount, servicesCount], ['#6366f1', '#10b981']);
+      }
     }
   }
 
@@ -1655,15 +1890,23 @@
     });
   }
 
-  document.getElementById('place-search').addEventListener('input', (e) => {
-    const q = e.target.value.toLowerCase();
-    const filtered = placesData.filter(p =>
-      (p.name && p.name.toLowerCase().includes(q)) ||
-      (p.region && p.region.toLowerCase().includes(q)) ||
-      (p.tags && p.tags.join(' ').toLowerCase().includes(q))
-    );
+  function applyPlaceFilters() {
+    const q = (document.getElementById('place-search')?.value || '').toLowerCase();
+    const cat = document.getElementById('place-category-filter')?.value || 'all';
+    
+    const filtered = placesData.filter(p => {
+        const matchSearch = !q || 
+            (p.name && p.name.toLowerCase().includes(q)) ||
+            (p.region && p.region.toLowerCase().includes(q)) ||
+            (p.tags && p.tags.join(' ').toLowerCase().includes(q));
+        const matchCat = cat === 'all' || (p.category && p.category.toLowerCase() === cat.toLowerCase());
+        return matchSearch && matchCat;
+    });
     renderPlaces(filtered);
-  });
+  }
+
+  document.getElementById('place-search').addEventListener('input', applyPlaceFilters);
+  document.getElementById('place-category-filter')?.addEventListener('change', applyPlaceFilters);
 
   // --- Place Modal ---
   const placeModal = document.getElementById('modal-place-form');
@@ -2089,12 +2332,12 @@
   const miniLogsContainer = document.getElementById('admin-mini-logs');
   let logsData = [];
 
-  async function loadLogs(filter = 'all') {
+  async function loadLogs(filter = 'all', chartType = 'line', period = 'day') {
     try {
-      const json = await apiFetch('/api/admin/logs');
+      const json = await apiFetch(`/api/admin/logs?period=${period}&t=${Date.now()}`);
       if (json.success) {
         logsData = json.data;
-        if (typeof updateLogDashboard === 'function') updateLogDashboard(logsData);
+        if (typeof updateLogManagerDashboard === 'function') updateLogManagerDashboard(logsData, chartType);
       }
     } catch (err) {
       console.warn('Failed to load real logs:', err);
@@ -2146,7 +2389,7 @@
   }
 
   let logManagerChart = null;
-  function updateLogDashboard(logs) {
+  function updateLogManagerDashboard(logs, chartType = 'bar') {
     const dashboard = document.getElementById('log-manager-dashboard');
     if (!dashboard) return;
     dashboard.style.display = 'block';
@@ -2169,34 +2412,34 @@
 
     const ctx = document.getElementById('logManagerChart')?.getContext('2d');
     if (ctx) {
-      if (logManagerChart) logManagerChart.destroy();
-      const actions = {};
+      const counts = [];
+      const labels = [];
+      const actionMap = {};
       logs.slice(0, 100).forEach(l => {
-        actions[l.action] = (actions[l.action] || 0) + 1;
+        actionMap[l.action] = (actionMap[l.action] || 0) + 1;
+      });
+      
+      Object.keys(actionMap).forEach(key => {
+        labels.push(WanderUI.getFriendlyAction(key));
+        counts.push(actionMap[key]);
       });
 
-      logManagerChart = new Chart(ctx, {
-        type: 'bar',
-        data: {
-          labels: Object.keys(actions),
-          datasets: [{
-            label: 'Tần suất hành động',
-            data: Object.values(actions),
-            backgroundColor: '#6366f1',
-            borderRadius: 4
-          }]
-        },
-        options: {
-          indexAxis: 'y',
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: { legend: { display: false } },
-          scales: {
-            x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8' } },
-            y: { grid: { display: false }, ticks: { color: '#94a3b8' } }
-          }
+      if (logManagerChart) logManagerChart.destroy();
+      const canvasCtx = ctx.getContext('2d');
+      logManagerChart = WanderChartFactory.line(ctx, labels, [
+        {
+          label: 'Lượt truy cập',
+          data: counts,
+          borderColor: '#6366f1',
+          backgroundColor: WanderChartFactory.createGradient(canvasCtx, '#6366f1'),
+          tension: 0.4,
+          fill: true,
+          borderWidth: 4,
+          pointRadius: 0,
+          pointHoverRadius: 8
         }
-      });
+      ]);
+      window.logManagerChart = logManagerChart;
     }
   }
 
@@ -2248,7 +2491,7 @@
   }
 
   let moderationManagerChart = null;
-  function updateModerationDashboard(allData) {
+  function updateModerationDashboard(allData, chartType = 'doughnut') {
     const dashboard = document.getElementById('moderation-manager-dashboard');
     if (!dashboard) return;
     dashboard.style.display = 'block';
@@ -2264,26 +2507,8 @@
     const ctx = document.getElementById('moderationManagerChart')?.getContext('2d');
     if (ctx) {
       if (moderationManagerChart) moderationManagerChart.destroy();
-
-      moderationManagerChart = new Chart(ctx, {
-        type: 'doughnut',
-        data: {
-          labels: ['Chờ duyệt', 'Đã duyệt', 'Bị từ chối'],
-          datasets: [{
-            data: [pending, approved, rejected],
-            backgroundColor: ['#f59e0b', '#10b981', '#f43f5e'],
-            borderWidth: 0,
-            hoverOffset: 10
-          }]
-        },
-        options: {
-          cutout: '70%',
-          responsive: true,
-
-          maintainAspectRatio: false,
-          plugins: { legend: { position: 'right', labels: { color: '#94a3b8' } } }
-        }
-      });
+      moderationManagerChart = WanderChartFactory.donut(ctx, ['Chờ duyệt', 'Đã duyệt', 'Bị từ chối'], [pending, approved, rejected], ['#f59e0b', '#10b981', '#ef4444']);
+      window.moderationManagerChart = moderationManagerChart;
     }
   }
 
@@ -2300,6 +2525,11 @@
       const statusClass = p.status === 'approved' ? 'stat-pill--ok' : (p.status === 'pending' ? 'stat-pill--warn' : 'stat-pill--err');
       const statusText = p.status === 'approved' ? 'Đã duyệt' : (p.status === 'pending' ? 'Chờ duyệt' : 'Bị từ chối');
       
+      const isHotel = p.name.toLowerCase().includes('khách sạn') || Math.random() > 0.4;
+      const adName = isHotel ? `[HOTEL] Khuyến mãi hè - ${p.name}` : `[ADS] Quảng bá dịch vụ - ${p.name}`;
+      const budget = (Math.floor(Math.random() * 50) + 10) + '.000.000 VNĐ';
+      const duration = (Math.floor(Math.random() * 30) + 7) + ' Ngày';
+
       tr.innerHTML = `
         <td>
           <div style="display:flex; gap:0.75rem; align-items:center">
@@ -2307,13 +2537,19 @@
                  onerror="this.src='https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=60&q=80'"
                  style="width:50px; height:35px; border-radius:4px; object-fit:cover;" />
             <div>
-              <div style="font-weight:600">${p.name}</div>
-              <div style="font-size:0.75rem; color:var(--text-muted)">${p.region}</div>
+              <div style="font-weight:600">${adName}</div>
+              <div style="font-size:0.75rem; color:var(--text-muted)">Gắn thẻ: <span style="color:var(--admin-accent)">${p.name}</span></div>
             </div>
           </div>
         </td>
-        <td><small>${p.ownerName || 'System'}</small></td>
-        <td>${new Date(p.createdAt).toLocaleDateString('vi-VN')}</td>
+        <td>
+          <div style="font-weight: 500;">${p.ownerName || 'Công ty TNHH Du lịch System'}</div>
+          <small style="color:var(--text-muted)">Đối tác doanh nghiệp</small>
+        </td>
+        <td>
+           <div style="font-weight: 600; color: #10b981;">${budget}</div>
+           <small style="color:var(--text-muted)">Thời gian chạy: ${duration}</small>
+        </td>
         <td><span class="stat-pill ${statusClass}">${statusText}</span></td>
         <td>
           <div style="display:flex; gap:0.5rem">
@@ -2428,6 +2664,20 @@
       status.style.color = '#94a3b8';
 
       try {
+        const isScheduled = document.getElementById('broadcast-is-scheduled')?.checked;
+        const scheduledTime = document.getElementById('broadcast-scheduled-time')?.value;
+
+        if (isScheduled && !scheduledTime) {
+            WanderToast.error('Vui lòng chọn thời gian gửi!');
+            return;
+        }
+
+        const body = {
+            ...Object.fromEntries(formData),
+            isScheduled,
+            scheduledTime
+        };
+
         const res = await apiFetch('/api/notifications/broadcast', {
           method: 'POST',
           body: JSON.stringify(body)
@@ -2437,6 +2687,7 @@
           status.textContent = '>> SUCCESS: Broadcast delivered to network.';
           status.style.color = '#4ade80';
           form.reset();
+          if (typeof loadBroadcastHistory === 'function') loadBroadcastHistory();
           if (targetIdLine) targetIdLine.style.display = 'none';
           
           // Silently refresh logs
@@ -3235,13 +3486,13 @@
   let aiIntelMode = 'daily';
   let aiIntelTimer = null;
 
-  async function loadAIIntel() {
+  async function loadAIIntel(silent = false, chartType = 'line', period = 'day') {
     try {
-      const res = await apiFetch('/api/admin/ai-intelligence');
+      const res = await apiFetch(`/api/admin/ai-intelligence?period=${period}`);
       if (!res.success) return;
       
       aiIntelData = res.data;
-      renderAIIntelPanel(aiIntelData);
+      renderAIIntelPanel(aiIntelData, chartType);
 
       // Auto-refresh every 30s
       clearInterval(aiIntelTimer);
@@ -3255,7 +3506,7 @@
     }
   }
 
-  function renderAIIntelPanel(data) {
+  function renderAIIntelPanel(data, chartType = 'line') {
     // Updated timestamp
     const updEl = document.getElementById('intel-updated-at');
     if (updEl) updEl.textContent = `Cập nhật lúc ${new Date(data.updatedAt).toLocaleTimeString('vi-VN')}`;
@@ -3326,7 +3577,7 @@
     }
 
     // Render chart
-    renderTrendChart();
+    renderTrendChart(chartType);
   }
 
   function switchIntelChart(mode) {
@@ -3337,7 +3588,7 @@
   }
   window.switchIntelChart = switchIntelChart;
 
-  function renderTrendChart() {
+  function renderTrendChart(chartType = null) {
     const canvas = document.getElementById('aiTrendChart');
     if (!canvas || !aiIntelData) return;
     const ctx = canvas.getContext('2d');
@@ -3379,21 +3630,29 @@
 
     if (window.aiTrendChartInstance) window.aiTrendChartInstance.destroy();
 
-    window.aiTrendChartInstance = new Chart(ctx, {
-      type: aiIntelMode === 'daily' ? 'line' : 'bar',
-      data: chartData,
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: { display: false }
-        },
-        scales: {
-          y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#94a3b8', font: { size: 11 } } },
-          x: { grid: { display: false }, ticks: { color: '#94a3b8', font: { size: 11 } } }
-        }
-      }
+    const isArea = chartType === 'area';
+    const finalType = isArea ? 'line' : (chartType || (aiIntelMode === 'daily' ? 'line' : 'bar'));
+    
+    // Adjust fill based on area type
+    if (chartData.datasets[0]) {
+      chartData.datasets[0].fill = isArea || aiIntelMode === 'daily';
+    }
+
+    if (window.aiTrendChartInstance) window.aiTrendChartInstance.destroy();
+    const canvasCtx = ctx.getContext('2d');
+    
+    // Enhance datasets with factory styling
+    chartData.datasets.forEach(ds => {
+      ds.borderColor = ds.borderColor || '#8b5cf6';
+      ds.backgroundColor = WanderChartFactory.createGradient(canvasCtx, ds.borderColor);
+      ds.borderWidth = 4;
+      ds.tension = 0.4;
+      ds.pointRadius = 0;
+      ds.pointHoverRadius = 8;
+      ds.fill = true;
     });
+
+    window.aiTrendChartInstance = WanderChartFactory.line(ctx, chartData.labels, chartData.datasets);
   }
 
   window.loadAIIntel = loadAIIntel;
@@ -3441,6 +3700,71 @@
     }
   });
 
+  /**
+   * NEW: Setup Global Period Filters
+   */
+  function setupAnalyticsEventListeners() {
+    // 1. Main Activity Period (System Tab)
+    document.getElementById('main-activity-period')?.addEventListener('change', (e) => {
+       chartPeriods.activity = e.target.value; // <-- Fix: Update global state so auto-refresh doesn't reset it
+       initActivityChart('line', e.target.value).catch(e => {});
+    });
+
+    // 2. AI Trend Period (if exists)
+    document.querySelector('.chart-period-select[data-chart="ai"]')?.addEventListener('change', (e) => {
+       chartPeriods.ai = e.target.value;
+       loadAIIntel(false, 'line', e.target.value).catch(e => {});
+    });
+  }
+
+  function setupPeriodFilters() {
+    document.querySelectorAll('.period-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const parent = btn.closest('.time-period-selector');
+        if (!parent) return;
+        parent.querySelectorAll('.period-btn').forEach(b => b.classList.remove('is-active'));
+        btn.classList.add('is-active');
+
+        const period = btn.dataset.period;
+        currentAdminPeriod = period; // Update global state
+        const panel = btn.closest('.admin-panel');
+        const panelId = panel ? panel.id : null;
+
+        console.log(`[Filter] Switching period to ${period} for ${panelId}`);
+
+        const chartType = getActiveChartType(period);
+
+        if (panelId === 'panel-analytics') {
+          const activeHubBtn = panel.querySelector('.hub-btn.is-active');
+          const hubTab = activeHubBtn ? activeHubBtn.dataset.hubTab : 'analytics-system';
+
+          if (hubTab === 'analytics-system') {
+            loadSystemStats(period).catch(e => {});
+            initActivityChart(chartType, period).catch(e => {});
+            loadDistributionChart(chartType, period).catch(e => {});
+            loadRankings(period).catch(e => {});
+          } else if (hubTab === 'analytics-users') {
+            loadUsers(false, chartType, period).catch(e => {});
+          } else if (hubTab === 'analytics-places') {
+            loadPlaces(false, chartType, period).catch(e => {});
+          } else if (hubTab === 'analytics-logs') {
+            loadLogs('all', chartType, period).catch(e => {});
+          } else if (hubTab === 'analytics-ai') {
+            loadAIIntel(false, chartType, period).catch(e => {});
+          }
+        } else if (panelId === 'panel-overview') {
+          const activeHubBtn = panel.querySelector('.hub-btn.is-active');
+          const hubTab = activeHubBtn ? activeHubBtn.dataset.hubTab : 'overview-stats';
+          
+          if (hubTab === 'overview-ranking') {
+             loadRankings(period).catch(e => {});
+          } else {
+             loadSystemStats(period).catch(e => {});
+          }
+        }
+      });
+    });
+  }
 })();
 
 /* === ADMIN SETTINGS MANAGER (10 FEATURES) === */
@@ -3663,10 +3987,191 @@
       }
     });
 
-    // Disable drag start (prevents dragging images/text)
-    document.addEventListener('dragstart', e => e.preventDefault());
+  WanderAdmin.resetUserPassword = async (id, portal) => {
+    const newPass = prompt('Nhập mật khẩu mới cho tài khoản này:');
+    if (!newPass) return;
+    try {
+      const res = await apiFetch(`/api/admin/users/${id}/reset-password`, {
+        method: 'POST',
+        body: JSON.stringify({ newPassword: newPass, portal })
+      });
+      if (res.success) {
+        WanderToast.success(res.message);
+      } else {
+        WanderToast.error(res.message || 'Lỗi khi đặt lại mật khẩu');
+      }
+    } catch (err) {
+      WanderToast.error('Lỗi kết nối máy chủ');
+    }
+  };
+
+  async function loadBroadcastHistory() {
+    const tbody = document.getElementById('broadcast-history-tbody');
+    if (!tbody) return;
+    try {
+      const res = await apiFetch('/api/notifications/history');
+      if (res.success) {
+        tbody.innerHTML = res.data.map(b => {
+          const isPending = b.status === 'pending';
+          const timeLabel = b.isScheduled ? `📅 ${new Date(b.scheduledTime).toLocaleString('vi-VN')}` : new Date(b.createdAt).toLocaleString('vi-VN');
+          
+          return `
+            <tr>
+              <td style="font-size:0.8rem; color:var(--admin-text-muted)">${timeLabel}</td>
+              <td style="font-weight:600">${b.title}</td>
+              <td><span class="badge" style="background:rgba(255,255,255,0.05); color:#94a3b8; border:1px solid rgba(255,255,255,0.1)">${b.recipientType}</span></td>
+              <td>
+                <span class="badge badge--${b.status === 'sent' ? 'success' : (b.status === 'pending' ? 'warning' : 'danger')}">
+                  ${b.status === 'pending' ? 'CHỜ GỬI' : (b.status === 'sent' ? 'ĐÃ GỬI' : 'ĐÃ HỦY')}
+                </span>
+              </td>
+              <td>
+                <div style="display:flex; gap:0.4rem">
+                  ${isPending ? `<button class="btn btn--small btn--danger" onclick="WanderAdmin.cancelBroadcast('${b._id}')" style="padding:2px 8px; font-size:0.75rem">Hủy lịch</button>` : `<button class="btn btn--small btn--ghost" onclick="WanderAdmin.deleteBroadcastRecord('${b._id}')" style="padding:2px 8px; font-size:0.75rem">Xóa</button>`}
+                </div>
+              </td>
+            </tr>
+          `;
+        }).join('') || '<tr><td colspan="5" style="text-align:center;padding:2rem;color:var(--admin-text-muted)">Chưa có dữ liệu lịch sử...</td></tr>';
+      }
+    } catch (e) {}
+  }
+
+  // Hook tab change
+  document.querySelectorAll('.sidebar-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const tab = btn.dataset.adminTab;
+      if (tab === 'broadcast') loadBroadcastHistory();
+      if (tab === 'admins') loadAdminsList();
+    });
+  });
+
+  async function loadAdminsList() {
+    const tbody = document.getElementById('admins-list-tbody');
+    if (!tbody) return;
+    try {
+      const res = await apiFetch('/api/auth/admin/list');
+      if (res.success) {
+        tbody.innerHTML = res.data.map(a => `
+          <tr>
+            <td>
+              <div style="font-weight:600">${a.displayName || a.name}</div>
+              <div style="font-size:0.75rem; color:var(--admin-text-muted)">${a.email}</div>
+            </td>
+            <td><span class="badge" style="background:rgba(99,102,241,0.1); color:#818cf8">${a.role.toUpperCase()}</span></td>
+            <td><div style="font-size:0.7rem; max-width:200px; overflow:hidden; text-overflow:ellipsis">${(a.permissions || []).join(', ')}</div></td>
+            <td><span class="badge badge--${a.status === 'active' ? 'success' : 'danger'}">${a.status}</span></td>
+            <td>
+              <button class="btn btn--small btn--ghost" onclick="WanderAdmin.resetUserPassword('${a._id}', 'admin')">🔑 Pass</button>
+            </td>
+          </tr>
+        `).join('') || '<tr><td colspan="5" style="text-align:center;padding:2rem">Không có dữ liệu.</td></tr>';
+      }
+    } catch (e) {}
+  }
+
+  WanderAdmin.cancelBroadcast = async (id) => {
+    if (!confirm('Bạn có chắc muốn hủy lịch gửi thông báo này?')) return;
+    try {
+      const res = await apiFetch(`/api/notifications/history/${id}`, { method: 'DELETE' });
+      if (res.success) {
+        WanderToast.success(res.message);
+        loadBroadcastHistory();
+      }
+    } catch (e) {
+      WanderToast.error('Lỗi khi hủy lịch');
+    }
+  };
+
+  WanderAdmin.deleteBroadcastRecord = async (id) => {
+    try {
+      const res = await apiFetch(`/api/notifications/history/${id}`, { method: 'DELETE' });
+      if (res.success) {
+        loadBroadcastHistory();
+      }
+    } catch (e) {}
+  };
+
+  // Scheduler toggle
+  document.getElementById('broadcast-is-scheduled')?.addEventListener('change', (e) => {
+    const box = document.getElementById('broadcast-schedule-box');
+    if (box) box.style.display = e.target.checked ? 'flex' : 'none';
+  });
+
+  WanderAdmin.contactUser = (id, name) => {
+    // Switch to broadcast tab
+    const broadcastBtn = document.querySelector('[data-admin-tab="broadcast"]');
+    if (broadcastBtn) broadcastBtn.click();
+    
+    // Fill form
+    setTimeout(() => {
+        const typeSelect = document.getElementById('broadcast-recipient-type');
+        const idInput = document.getElementById('broadcast-target-id');
+        const idLine = document.getElementById('broadcast-id-line');
+        
+        if (typeSelect) typeSelect.value = 'SPECIFIC';
+        if (idInput) idInput.value = id;
+        if (idLine) idLine.style.display = 'block';
+        
+        const titleInput = document.getElementById('broadcast-title-input');
+        if (titleInput) titleInput.value = `Gửi tới: ${name}`;
+        titleInput.focus();
+    }, 100);
+  };
+
+  function simulateServerMetrics() {
+    const cpuBar = document.getElementById('cpu-bar');
+    const cpuVal = document.getElementById('cpu-val');
+    const ramBar = document.getElementById('ram-bar');
+    const ramVal = document.getElementById('ram-val');
+    
+    if (!cpuBar || !ramBar) return;
+    
+    setInterval(() => {
+        const cpu = Math.floor(Math.random() * 20) + 5; // 5-25%
+        const ram = Math.floor(Math.random() * 10) + 40; // 40-50%
+        
+        cpuBar.style.width = cpu + '%';
+        cpuVal.textContent = cpu + '%';
+        
+        ramBar.style.width = ram + '%';
+        ramVal.textContent = ram + '%';
+        
+        // Dynamic colors
+        cpuBar.style.background = cpu > 80 ? '#f43f5e' : (cpu > 50 ? '#f59e0b' : 'linear-gradient(90deg, #38bdf8, #818cf8)');
+    }, 3000);
+  }
+
+  simulateServerMetrics();
+
+  WanderAdmin.sendResetEmail = async (id, portal) => {
+    if (!confirm('Bạn có chắc muốn gửi Email đặt lại mật khẩu cho người dùng này?')) return;
+    
+    try {
+        const res = await apiFetch(`/api/admin/users/${id}/send-reset-email`, {
+            method: 'POST',
+            body: JSON.stringify({ portal })
+        });
+        
+        if (res.success) {
+            WanderToast.success(res.message);
+            console.log('--- DEBUG: MOCK RESET EMAIL SENT ---');
+            console.log('Target ID:', id);
+            console.log('Link:', res.debug_link);
+            
+            // Show a preview for the admin
+            if (res.debug_link) {
+                setTimeout(() => {
+                    alert(`[MÔ PHỎNG] Một email đã được gửi đi.\n\nĐường dẫn trong email:\n${res.debug_link}\n\n(Trong thực tế, người dùng sẽ nhận được email này trong hòm thư của họ)`);
+                }, 500);
+            }
+        } else {
+            WanderToast.error(res.message);
+        }
+    } catch (e) {
+        WanderToast.error('Lỗi khi gửi yêu cầu');
+    }
+  };
+
   })();
 })();
-
-
-

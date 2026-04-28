@@ -12,7 +12,7 @@ const plannerDb = mongoose.createConnection(plannerUri, {
 });
 
 plannerDb.on('connected', () => {
-  // Silent
+  console.log('✅ Planner MongoDB connected');
 });
 
 plannerDb.on('error', (err) => {

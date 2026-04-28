@@ -49,7 +49,12 @@ const userSchema = new mongoose.Schema({
   rank: { type: String, default: 'Đồng' },
   rankTier: { type: String, default: 'I' },
   claimedQuests: [String],
+<<<<<<< HEAD
   favorites: [{ type: String }], // Array of place IDs
+=======
+  resetPasswordToken: String,
+  resetPasswordExpires: Date,
+>>>>>>> 8f998faf2c98a809fb72154171503dc8e5d95f0e
   createdAt: { type: Date, default: Date.now }
 });
 

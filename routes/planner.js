@@ -194,17 +194,52 @@ Quy tắc tuyệt đối:
     }
 
     // Lưu vào database, tự động gắn userId nếu đang đăng nhập
-    const newItin = new Itinerary({
-      destination, days, budget, companion, interests,
+    const itinerary = new Itinerary({
+      userId: req.user ? req.user.id : null,
+      destination: destination,
+      days: days,
+      budget: budget,
+      companion: companion,
+      interests: interests,
       tripDate: tripDate ? new Date(tripDate) : null,
       planJson: aiPlanJson,
-      userId: req.user ? req.user.id : null,
       userName,
       userEmail
     });
-    const savedDoc = await newItin.save();
+
+    const savedDoc = await itinerary.save();
+
+    // AI Self-Learning: Extract insights from the generated plan and update user profile
     if (req.user) {
-      await logAction(userEmail, 'user', 'ITINERARY_GENERATED', { destination, days, itineraryId: savedDoc._id });
+      try {
+        const user = await User.findById(req.user.id);
+        if (user) {
+          const insightPrompt = `Analyze this trip plan and extract 2-3 short preferences/habits of this user in Vietnamese. 
+          Return ONLY a JSON object with "insights" array.
+          Plan: ${aiPlanJson.tripSummary}
+          Style: ${req.body.style || ''}
+          Pace: ${req.body.pace || ''}
+          Interests: ${req.body.interests || ''}`;
+
+          const insightRes = await groq.chat.completions.create({
+            model: 'llama-3.1-8b-instant',
+            messages: [{ role: 'user', content: insightPrompt }],
+            response_format: { type: 'json_object' }
+          });
+          
+          const insightsData = JSON.parse(insightRes.choices[0].message.content);
+          if (insightsData && Array.isArray(insightsData.insights)) {
+            // Keep unique insights, limit to 20 total
+            const existingInsights = user.preferenceProfile.aiInsights || [];
+            const newInsights = [...new Set([...existingInsights, ...insightsData.insights])].slice(-20);
+            user.preferenceProfile.aiInsights = newInsights;
+            user.preferenceProfile.lastAnalyzed = new Date();
+            await user.save();
+          }
+        }
+      } catch (aiErr) {
+        console.warn('AI insight extraction failed:', aiErr.message);
+      }
     }
 
     res.json({ success: true, plan: aiPlanJson, itineraryId: savedDoc._id });
@@ -307,22 +342,17 @@ router.post('/discover', async (req, res) => {
         content: `Bạn là trợ lý du lịch WanderViệt. Nhiệm vụ của bạn là lắng nghe yêu cầu của khách hàng (ngân sách, sở thích, thời tiết...) và gợi ý những điểm đến phù hợp tại Việt Nam.
         
         QUY TẮC:
-        1. Nếu khách hàng đưa ra ít thông tin (VD: "500k đi đâu?"), TUYỆT ĐỐI không được gợi ý ngay. Hãy đặt ít nhất 2-3 câu hỏi để tìm hiểu:
-           - Bạn định đi trong bao nhiêu lâu (1 ngày hay qua đêm)?
-           - Bạn đi từ đâu? (Quan trọng để tính phí di chuyển)
-           - Bạn thích kiểu đi chill, ăn uống hay check-in sống ảo?
-           - Bạn đi một mình hay với ai?
-        2. Nếu thông tin đã đủ, hãy gợi ý 2-3 địa danh cụ thể kèm theo lý do vì sao nó hợp với ngân sách đó.
-        3. Phân tích ngân sách thực tế cực kỳ khắt khe. Nếu ngân sách quá thấp (VD: 200k), hãy cảnh báo khách và gợi ý những chỗ gần nhà.
+        1. Nếu thông tin thiếu, hãy hỏi gộp các câu hỏi về: Nơi xuất phát, Số người, Sở thích chính.
+        2. Nếu đủ thông tin, hãy gợi ý 2-3 địa danh cụ thể. Với mỗi địa danh, hãy giải thích NGẮN GỌN tại sao nó phù hợp với ngân sách và sở thích.
+        3. TRÌNH BÀY: Dùng icon sinh động.
         4. Trả về JSON theo cấu trúc:
         {
           "answer": "Câu trả lời của AI cho khách hàng",
           "suggestions": ["Địa danh 1", "Địa danh 2"], 
-          "finalSelection": "Tên địa danh",
-          "suggestedBudget": "Không quan tâm hạn mức", // Mặc định nếu khách không nhắc tiền. Hoặc chọn mức phù hợp: "dưới 1 triệu VNĐ", "1 đến 3 triệu VNĐ", "3 đến 7 triệu VNĐ", "7 đến 15 triệu VNĐ", "trên 15 triệu VNĐ"
-          "exactBudget": "500.000 VNĐ",
-          "isShortTerm": true, // true nếu là đi ăn, đi chơi ngắn trong vài tiếng hoặc trong ngày (bao gồm cả đi chơi đêm rồi về), false nếu là đi du lịch cần thuê chỗ ngủ qua đêm
-          "outingTime": "21:00" // Giờ đi nếu khách nhắc tới
+          "finalSelection": "Tên địa danh (chỉ điền khi khách đã chốt hoặc bạn tự tin chọn 1 cái tốt nhất)",
+          "suggestedDays": 3, // Số ngày kiến nghị cho địa điểm này
+          "suggestedBudget": "3 đến 7 triệu VNĐ", // Mức ngân sách phù hợp
+          "isShortTerm": false
         }`
       }
     ];
@@ -347,6 +377,85 @@ router.post('/discover', async (req, res) => {
   } catch (error) {
     console.error('Discovery API Error:', error);
     res.status(500).json({ success: false, message: 'Lỗi gợi ý AI.' });
+  }
+});
+
+/**
+ * NEW: SMART WIZARD API
+ * Handles the "grouped question" flow and intent deduction.
+ */
+router.post('/smart-wizard', optionalAuth, async (req, res) => {
+  try {
+    const { message, currentData, step, history } = req.body;
+    
+    // Lấy context từ User profile (nếu có) để AI tự học
+    let userContext = "";
+    if (req.user) {
+      const user = await User.findById(req.user.id).select('preferenceProfile preferences');
+      if (user && user.preferenceProfile) {
+        userContext = `\nAI Insights about user: ${user.preferenceProfile.aiInsights.join(', ')}`;
+      }
+    }
+
+    const systemPrompt = `Bạn là bộ não của Trợ lý Lịch trình Thông minh WanderViệt.
+Nhiệm vụ: Thu thập thông tin từ người dùng để tạo lịch trình du lịch cá nhân hóa.
+
+QUY TẮC CỐT LÕI:
+1. GOM NHÓM CÂU HỎI: Hỏi gộp các thông tin còn thiếu. Tập trung vào 3 nhóm mới:
+   - CHỖ Ở: Bạn thích ở đâu? (Resort sang chảnh, Homestay ấm cúng, Hotel trung tâm, hay Cắm trại?)
+   - ĂN UỐNG: Phong cách ẩm thực? (Món địa phương/Vỉa hè, Nhà hàng sang trọng, Buffet, hay Tự túc?)
+   - ƯU TIÊN: Bạn muốn dành tiền và thời gian vào đâu nhiều nhất? (Hoạt động mạo hiểm, Nghỉ ngơi thư giãn, Mua sắm, hay Tham quan di tích?)
+2. TRÌNH BÀY: Dùng ngôn ngữ tự nhiên. Phản hồi xác nhận thông tin bằng CHỮ IN HOA để highlight.
+3. PHÂN TÍCH: Tự suy luận từ câu trả lời của khách để điền vào detectedData.
+
+Cấu trúc JSON:
+{
+  "detectedData": { ... },
+  "nextStep": "objective" | "aggregate_info" | "ready",
+  "aiMessage": "Câu hỏi gợi mở về Chỗ ở, Ăn uống và Ưu tiên...",
+  "uiOptions": {
+    "type": "multi_select" | "single_select",
+    "groups": [
+      { "id": "accommodation", "title": "Bạn muốn ở đâu?", "options": [
+          { "id": "resort", "label": "Resort/Villa", "icon": "🏨" },
+          { "id": "homestay", "label": "Homestay/Bungalow", "icon": "🏡" },
+          { "id": "hotel", "label": "Khách sạn", "icon": "🏢" },
+          { "id": "camping", "label": "Cắm trại/Outdoor", "icon": "⛺" }
+      ]},
+      { "id": "food_style", "title": "Gu ăn uống của bạn?", "options": [
+          { "id": "local", "label": "Đặc sản địa phương", "icon": "🍲" },
+          { "id": "fine_dining", "label": "Nhà hàng sang trọng", "icon": "🍷" },
+          { "id": "street_food", "label": "Ẩm thực đường phố", "icon": "🍢" }
+      ]},
+      { "id": "priority", "title": "Bạn ưu tiên dành thời gian vào đâu?", "options": [
+          { "id": "activity", "label": "Hoạt động trải nghiệm", "icon": "🧗" },
+          { "id": "relax", "label": "Nghỉ ngơi/Chill", "icon": "🧘" },
+          { "id": "shopping", "label": "Mua sắm/Giải trí", "icon": "🛍️" }
+      ]}
+    ]
+  }
+}
+
+Dữ liệu hiện có: ${JSON.stringify(currentData)}
+${userContext}`;
+
+    const messages = [
+      { role: 'system', content: systemPrompt }
+    ];
+    if (history) history.forEach(h => messages.push(h));
+    messages.push({ role: 'user', content: message || "Bắt đầu" });
+
+    const response = await groq.chat.completions.create({
+      model: 'llama-3.3-70b-versatile',
+      messages: messages,
+      response_format: { type: 'json_object' }
+    });
+
+    const result = JSON.parse(response.choices[0].message.content);
+    res.json({ success: true, ...result });
+  } catch (error) {
+    console.error('Smart Wizard Error:', error);
+    res.status(500).json({ success: false, message: 'Lỗi bộ não AI.' });
   }
 });
 

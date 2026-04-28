@@ -1,14 +1,18 @@
 const express = require('express');
 const router = express.Router();
+const crypto = require('crypto');
 const User = require('../models/User');
 const AdminAccount = require('../models/AdminAccount');
 const BusinessAccount = require('../models/BusinessAccount');
 const Place = require('../models/Place');
 const Feedback = require('../models/Feedback');
+const NodeCache = require('node-cache');
+const statsCache = new NodeCache({ stdTTL: 30, checkperiod: 60 });
 const { adminTokenAuth, JWT_SECRET } = require('./auth');
 const upload = require('../middlewares/upload');
 const SystemLog = require('../models/SystemLog');
 const logAction = require('../utils/logger');
+const bcrypt = require('bcryptjs');
 
 // Cấu hình Rank cho Admin API
 const RANK_CONFIG = [
@@ -134,50 +138,93 @@ router.put('/profile', adminTokenAuth, adminAuth, upload.single('avatarFile'), a
 // ─────────────────────────────────────────────
 router.get('/stats/trend', adminTokenAuth, adminAuth, async (req, res) => {
   try {
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const period = req.query.period || 'day';
+    const targetYear = req.query.year ? parseInt(req.query.year) : null;
+    
+    // Check Cache
+    const cacheKey = `trend_${period}_${targetYear || 'current'}`;
+    const cached = statsCache.get(cacheKey);
+    if (cached) return res.json(cached);
 
-    // 1. Trend: Users Registration (from User collection)
-    const userStats = await User.aggregate([
-      { $match: { role: 'user', createdAt: { $gte: sevenDaysAgo } } },
-      { $group: { _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } }, count: { $sum: 1 } } }
-    ]);
+    let startDate = new Date();
+    let endDate = new Date();
+    let format = "%Y-%m-%d";
+    let steps = 7;
+    let stepType = 'day';
 
-    // 2. Trend: Business Registration (from BusinessAccount + User with role business)
-    const bizStats = await BusinessAccount.aggregate([
-      { $match: { createdAt: { $gte: sevenDaysAgo } } },
-      { $group: { _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } }, count: { $sum: 1 } } }
-    ]);
-    const userBizStats = await User.aggregate([
-      { $match: { role: 'business', createdAt: { $gte: sevenDaysAgo } } },
-      { $group: { _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } }, count: { $sum: 1 } } }
-    ]);
+    if (period === 'hour') {
+      startDate.setHours(startDate.getHours() - 23, 0, 0, 0);
+      format = "%Y-%m-%d:%H";
+      steps = 24;
+      stepType = 'hour';
+    } else if (period === 'day') {
+      startDate.setDate(startDate.getDate() - 29);
+      format = "%Y-%m-%d";
+      steps = 30;
+      stepType = 'day';
+    } else if (period === 'week') {
+      startDate.setDate(startDate.getDate() - 6);
+      format = "%Y-%m-%d";
+      steps = 7;
+      stepType = 'day';
+    } else if (period === 'month') {
+      // "Tháng" -> So sánh các tháng trong năm (Tháng 1 -> 12)
+      if (targetYear) {
+        startDate = new Date(targetYear, 0, 1);
+        endDate = new Date(targetYear, 11, 31, 23, 59, 59);
+      } else {
+        startDate = new Date(new Date().getFullYear(), 0, 1);
+        endDate = new Date(new Date().getFullYear(), 11, 31, 23, 59, 59);
+      }
+      format = "%Y-%m";
+      steps = 12;
+      stepType = 'month';
+    } else if (period === 'year') {
+      // "Năm" -> Xu hướng dài hạn (5 năm)
+      startDate.setFullYear(startDate.getFullYear() - 4, 0, 1);
+      format = "%Y";
+      steps = 5;
+      stepType = 'year';
+    } else {
+      startDate.setDate(startDate.getDate() - 6);
+      format = "%Y-%m-%d";
+      steps = 7;
+      stepType = 'day';
+    }
 
-    // 3. Trend: Admin Registration (from AdminAccount + User with role admin/superadmin)
-    const adminStats = await AdminAccount.aggregate([
-      { $match: { createdAt: { $gte: sevenDaysAgo } } },
-      { $group: { _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } }, count: { $sum: 1 } } }
-    ]);
-    const userAdminStats = await User.aggregate([
-      { $match: { role: { $in: ['admin', 'superadmin'] }, createdAt: { $gte: sevenDaysAgo } } },
-      { $group: { _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } }, count: { $sum: 1 } } }
-    ]);
+    const match = { createdAt: { $gte: startDate, $lte: endDate } };
+    const group = { _id: { $dateToString: { format: format, date: "$createdAt" } }, count: { $sum: 1 } };
 
-    const placesTrend = await Place.aggregate([
-      { $match: { createdAt: { $gte: sevenDaysAgo } } },
-      { $group: { _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } }, count: { $sum: 1 } } }
-    ]);
-
-    const feedbacksTrend = await Feedback.aggregate([
-      { $match: { createdAt: { $gte: sevenDaysAgo } } },
-      { $group: { _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } }, count: { $sum: 1 } } }
+    // Fetch data in parallel
+    const [userStats, bizStats, userBizStats, adminStats, userAdminStats, placesTrend, feedbacksTrend] = await Promise.all([
+      User.aggregate([{ $match: { ...match, role: 'user' } }, { $group: group }]),
+      BusinessAccount.aggregate([{ $match: match }, { $group: group }]),
+      User.aggregate([{ $match: { ...match, role: 'business' } }, { $group: group }]),
+      AdminAccount.aggregate([{ $match: match }, { $group: group }]),
+      User.aggregate([{ $match: { ...match, role: { $in: ['admin', 'superadmin'] } } }, { $group: group }]),
+      Place.aggregate([{ $match: match }, { $group: group }]),
+      Feedback.aggregate([{ $match: match }, { $group: group }])
     ]);
 
     const result = [];
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      const dateStr = d.toISOString().split('T')[0];
+    for (let i = 0; i < steps; i++) {
+      const d = new Date(startDate);
+      if (stepType === 'hour') d.setHours(d.getHours() + i);
+      else if (stepType === 'month') d.setMonth(d.getMonth() + i);
+      else if (stepType === 'year') d.setFullYear(d.getFullYear() + i);
+      else d.setDate(d.getDate() + i);
+
+      let dateStr;
+      if (stepType === 'hour') {
+         const h = d.getHours();
+         dateStr = d.toISOString().split('T')[0] + ":" + (h < 10 ? '0' + h : h);
+      } else if (stepType === 'month') {
+         dateStr = d.toISOString().slice(0, 7); // YYYY-MM
+      } else if (stepType === 'year') {
+         dateStr = d.toISOString().slice(0, 4); // YYYY
+      } else {
+         dateStr = d.toISOString().split('T')[0];
+      }
       
       const u = (userStats.find(x => x._id === dateStr)?.count || 0);
       const b = (bizStats.find(x => x._id === dateStr)?.count || 0) + (userBizStats.find(x => x._id === dateStr)?.count || 0);
@@ -195,7 +242,10 @@ router.get('/stats/trend', adminTokenAuth, adminAuth, async (req, res) => {
         interactions: Math.floor(Math.random() * 30) + 5
       });
     }
-    res.json({ success: true, data: result });
+    
+    const finalResult = { success: true, data: result };
+    statsCache.set(cacheKey, finalResult, 300); // Cache 5 mins
+    res.json(finalResult);
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -206,6 +256,11 @@ router.get('/stats/distribution', adminTokenAuth, adminAuth, async (req, res) =>
   try {
     const today = new Date();
     today.setHours(0,0,0,0);
+
+    // Check Cache
+    const cacheKey = 'distribution_stats';
+    const cached = statsCache.get(cacheKey);
+    if (cached) return res.json(cached);
 
     const [userRes, bizRes, adminRes, userBizRes, userAdminRes] = await Promise.all([
       User.aggregate([ { $match: { role: 'user' } }, { $group: { _id: 'user', count: { $sum: 1 } } } ]),
@@ -223,7 +278,9 @@ router.get('/stats/distribution', adminTokenAuth, adminAuth, async (req, res) =>
 
     const newMembers = await User.countDocuments({ createdAt: { $gte: today }, role: 'user' });
 
-    res.json({ success: true, data: { roles, newMembers } });
+    const finalResult = { success: true, data: { roles, newMembers } };
+    statsCache.set(cacheKey, finalResult, 60); // Cache 1 min
+    res.json(finalResult);
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -252,115 +309,165 @@ router.get('/stats/rankings', adminTokenAuth, adminAuth, async (req, res) => {
     const limit = parseInt(req.query.limit) || 5;
     const safeLimit = Math.min(limit, 50);
 
+    // Kiểm tra bộ nhớ đệm (Cache)
+    const cacheKey = `rankings_${period}_${safeLimit}`;
+    const cachedData = statsCache.get(cacheKey);
+    if (cachedData) return res.json(cachedData);
+
     let dateFilter = {};
     if (period === 'today') {
       const startOfToday = new Date();
       startOfToday.setHours(0, 0, 0, 0);
       dateFilter = { createdAt: { $gte: startOfToday } };
+    } else if (period === 'week') {
+      const startOfWeek = new Date();
+      startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay() + (startOfWeek.getDay() === 0 ? -6 : 1));
+      startOfWeek.setHours(0, 0, 0, 0);
+      dateFilter = { createdAt: { $gte: startOfWeek } };
+    } else if (period === 'month') {
+      const startOfMonth = new Date();
+      startOfMonth.setDate(1);
+      startOfMonth.setHours(0, 0, 0, 0);
+      dateFilter = { createdAt: { $gte: startOfMonth } };
     }
 
-    // 1. Top Itineraries (Real counts from Itinerary collection)
-    const itRankRaw = await Itinerary.aggregate([
-      { $match: period === 'today' ? dateFilter : {} },
-      { $group: { _id: "$userId", count: { $sum: 1 }, userName: { $first: "$userName" }, userEmail: { $first: "$userEmail" } } },
-      { $sort: { count: -1 } },
-      { $limit: safeLimit }
+    const logFilter = (period !== 'alltime') ? { timestamp: dateFilter.createdAt } : {};
+
+    // Fetch data in parallel
+    const results = await Promise.allSettled([
+      // 1. Top Itineraries (with 5s timeout)
+      (async () => {
+        const query = Itinerary.aggregate([
+          { $match: period !== 'alltime' ? dateFilter : {} },
+          { $group: { _id: "$userId", count: { $sum: 1 } } },
+          { $sort: { count: -1, _id: 1 } }, // Sắp xếp ổn định
+          { $limit: safeLimit }
+        ]);
+        return Promise.race([query, new Promise((_, reject) => setTimeout(() => reject(new Error('DB Timeout Itinerary')), 5000))]);
+      })(),
+      // 2. Log Stats (with 5s timeout)
+      (async () => {
+        const query = SystemLog.aggregate([
+          { $match: logFilter },
+          { $group: { _id: "$userName", activityCount: { $sum: 1 } } },
+          { $sort: { activityCount: -1, _id: 1 } }, // Sắp xếp ổn định
+          { $limit: safeLimit * 2 } 
+        ]);
+        return Promise.race([query, new Promise((_, reject) => setTimeout(() => reject(new Error('DB Timeout SystemLog')), 5000))]);
+      })(),
+      // 3. Top Deposits
+      User.find({ role: 'user' }).sort({ totalSpent: -1, _id: 1 }).limit(safeLimit).select('name displayName email avatar isOnline totalSpent').lean(),
+      // 4. Businesses
+      BusinessAccount.find().sort({ points: -1, _id: 1 }).limit(safeLimit).select('name displayName points avatar email').lean(),
+      // 5. Places
+      Place.find().sort({ favoritesCount: -1, _id: 1 }).limit(safeLimit).select('name image region favoritesCount').lean()
     ]);
 
-    // Map to user objects for display
-    const topItineraries = [];
-    for (let item of itRankRaw) {
-      if (!item._id) continue;
-      const user = await User.findById(item._id).select('displayName name email avatar');
-      if (user) {
-        topItineraries.push({
-          _id: user._id,
-          name: user.name,
-          displayName: user.displayName || user.name,
-          email: user.email,
-          avatar: user.avatar,
-          count: item.count
-        });
+    const itRankRaw = results[0].status === 'fulfilled' ? results[0].value : [];
+    const logStats = results[1].status === 'fulfilled' ? results[1].value : [];
+    const topDeposits = results[2].status === 'fulfilled' ? results[2].value : [];
+    const bizAccounts = results[3].status === 'fulfilled' ? results[3].value : [];
+    const topPlaces = results[4].status === 'fulfilled' ? results[4].value : [];
+
+    const topBusinesses = bizAccounts.map(b => ({
+      _id: b._id,
+      name: b.name, displayName: b.displayName || b.name, email: b.email, avatar: b.avatar,
+      score: b.points || 0
+    })).sort((a, b) => b.score - a.score || String(a._id).localeCompare(String(b._id))).slice(0, safeLimit);
+
+    // Create a Map to unify all active users in this period
+    const userActivityMap = new Map(); // Key: userId or email/name, Value: { itCount, logCount }
+
+    // Add Itinerary activities
+    itRankRaw.forEach(item => {
+      if (!item._id) return;
+      const key = String(item._id);
+      userActivityMap.set(key, { itCount: item.count, logCount: 0 });
+    });
+
+    // Add/Merge Log activities
+    logStats.forEach(log => {
+      if (!log._id) return;
+      const key = log._id;
+      if (userActivityMap.has(key)) {
+        userActivityMap.get(key).logCount = log.activityCount;
+      } else {
+        userActivityMap.set(key, { itCount: 0, logCount: log.activityCount });
       }
+    });
+
+    if (userActivityMap.size === 0) {
+      return res.json({ 
+        success: true, 
+        data: { topActive: [], topItineraries: [], topDeposits, topBusinesses, topPlaces } 
+      });
     }
 
-    // 2. Top Active Users (Score based on Logs + Online Status)
-    // We'll use SystemLog to count activities in the period
-    const logFilter = period === 'today' ? { timestamp: { $gte: dateFilter.createdAt } } : {};
-    const logStats = await SystemLog.aggregate([
-      { $match: logFilter },
-      { $group: { _id: "$userName", activityCount: { $sum: 1 } } }
-    ]);
+    // Fetch user details for all unique keys in the activity map
+    const mongoose = require('mongoose');
+    const allKeys = Array.from(userActivityMap.keys());
+    const validIds = allKeys.filter(k => mongoose.Types.ObjectId.isValid(k));
+    const otherKeys = allKeys.filter(k => !mongoose.Types.ObjectId.isValid(k));
 
-    const users = await User.find({ role: 'user' }).select('name displayName email avatar isOnline status');
-    
-    // Calculate minutes passed since start of today to cap the value
+    const relevantUsers = await User.find({
+      role: 'user',
+      $or: [
+        { _id: { $in: validIds } },
+        { email: { $in: otherKeys } },
+        { name: { $in: otherKeys } }
+      ]
+    }).select('name displayName email avatar points').lean();
+
+    // Now calculate actual display values for everyone
+    const processedActive = [];
+    const processedItins = [];
+
     const now = new Date();
     const startOfToday = new Date();
     startOfToday.setHours(0, 0, 0, 0);
     const minutesPassedToday = Math.floor((now - startOfToday) / 60000);
 
-    const topActive = users.map(u => {
-      const logs = logStats.find(l => l._id === u.email) || { activityCount: 0 };
-      const its = itRankRaw.find(i => String(i._id) === String(u._id)) || { count: 0 };
+    relevantUsers.forEach(u => {
+      const itData = userActivityMap.get(String(u._id)) || { itCount: 0 };
+      const logData = userActivityMap.get(u.email) || userActivityMap.get(u.name) || { logCount: 0 };
       
-      // 1. Score for Sorting (can include bonuses)
-      let score = (u.isOnline ? 20 : 0) + (its.count * 10) + logs.activityCount;
-      
-      // 2. Realistic Minutes for Display
-      // Estimate: 2 minutes per log action + 5 minutes per itinerary
-      let estimatedMins = (logs.activityCount * 2) + (its.count * 5);
-      if (u.isOnline) estimatedMins += 2; // small bonus for being currently active
-      
-      // Cap by real time passed today if period is 'today'
-      let displayMinutes = estimatedMins;
-      if (period === 'today') {
-        displayMinutes = Math.min(estimatedMins, minutesPassedToday);
-        // Ensure it's at least 1 if they are online
-        if (u.isOnline && displayMinutes < 1) displayMinutes = 1;
+      const totalItins = itData.itCount || (userActivityMap.get(u.email)?.itCount) || (userActivityMap.get(u.name)?.itCount) || 0;
+      const totalLogs = logData.logCount || (userActivityMap.get(String(u._id))?.logCount) || 0;
+
+      if (totalItins > 0) {
+        processedItins.push({
+          _id: u._id,
+          name: u.name, displayName: u.displayName || u.name, email: u.email, avatar: u.avatar,
+          count: totalItins
+        });
       }
 
-      return {
-        _id: u._id,
-        name: u.name,
-        displayName: u.displayName || u.name,
-        email: u.email,
-        avatar: u.avatar,
-        score,
-        minutes: Math.floor(displayMinutes)
-      };
-    }).sort((a, b) => b.score - a.score).slice(0, safeLimit);
+      if (totalLogs > 0 || totalItins > 0) {
+        let estimatedMins = (totalLogs * 2) + (totalItins * 15); // Itinerary is heavy
+        let displayMinutes = period === 'today' ? Math.min(estimatedMins, minutesPassedToday) : estimatedMins;
+        if (displayMinutes < 1) displayMinutes = 1;
 
-    // 3. Top Deposits (Cumulative as we don't have transaction history yet)
-    const topDeposits = await User.find({ role: 'user' })
-      .sort({ totalSpent: -1 })
-      .limit(safeLimit)
-      .select('displayName name email avatar totalSpent');
+        processedActive.push({
+          _id: u._id,
+          name: u.name, displayName: u.displayName || u.name, email: u.email, avatar: u.avatar,
+          minutes: Math.floor(displayMinutes)
+        });
+      }
+    });
 
-    // 4. Top Businesses (Based on Points/XP)
-    const bizAccounts = await BusinessAccount.find()
-      .sort({ points: -1 })
-      .limit(safeLimit)
-      .select('name displayName points avatar email')
-      .lean();
-    
-    const topBusinesses = bizAccounts.map(b => ({
-      _id: b._id,
-      name: b.name,
-      displayName: b.displayName || b.name,
-      email: b.email,
-      avatar: b.avatar,
-      score: b.points || 0
-    }));
+    // FINAL STRICT SORTING & SLICING (Double check)
+    const topItineraries = processedItins
+      .sort((a, b) => b.count - a.count || String(a._id).localeCompare(String(b._id)))
+      .slice(0, safeLimit);
 
-    // 5. Top Places
-    const topPlaces = await Place.find()
-      .sort({ favoritesCount: -1 })
-      .limit(safeLimit)
-      .select('name image region favoritesCount');
+    const topActive = processedActive
+      .sort((a, b) => b.minutes - a.minutes || String(a._id).localeCompare(String(b._id)))
+      .slice(0, safeLimit);
 
-    res.json({ 
+    // Final response
+    const finalResult = { 
       success: true, 
+      version: "2.0-stable",
       data: { 
         topActive, 
         topItineraries, 
@@ -368,8 +475,14 @@ router.get('/stats/rankings', adminTokenAuth, adminAuth, async (req, res) => {
         topBusinesses,
         topPlaces 
       } 
-    });
+    };
+
+    // Lưu vào bộ nhớ đệm (30 giây)
+    statsCache.set(cacheKey, finalResult);
+    
+    res.json(finalResult);
   } catch (error) {
+    console.error('[Rankings API Error]:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 });
@@ -1048,6 +1161,31 @@ router.post('/users/:id/impersonate', adminTokenAuth, superAdminAuth, async (req
   }
 });
 
+// API: Đặt lại mật khẩu (User/Business/Admin)
+router.post('/users/:id/reset-password', adminTokenAuth, adminAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { newPassword, portal } = req.body; 
+    
+    if (!newPassword) return res.status(400).json({ success: false, message: 'Cần cung cấp mật khẩu mới.' });
+
+    const modelMap = { 'user': User, 'business': BusinessAccount, 'admin': AdminAccount };
+    const Model = modelMap[portal] || User;
+
+    const account = await Model.findById(id);
+    if (!account) return res.status(404).json({ success: false, message: 'Không tìm thấy tài khoản.' });
+
+    account.password = await bcrypt.hash(newPassword, 10);
+    await account.save();
+
+    await logAction(req.user.email, req.user.role, 'ADMIN_RESET_PASSWORD', { target: account.email, portal }, req.ip, req.headers['user-agent']);
+    
+    res.json({ success: true, message: `Đã cập nhật mật khẩu mới cho ${account.email}` });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 // API: AI Command Sentinel (Tri thức quản trị)
 router.post('/ai-chat', adminTokenAuth, adminAuth, async (req, res) => {
   try {
@@ -1072,18 +1210,20 @@ ${recentLogs.map(l => `- ${l.userName || 'Hệ thống'}: ${l.action}`).join('\n
         { 
           role: "system", 
           content: `BẠN LÀ: AI Sentinel - Cố vấn tối cao của WanderViệt.
-NHIỆM VỤ: Phân tích, so sánh thống kê, gợi ý hướng phát triển và hỗ trợ Super Admin điều hành.
-PHONG CÁCH: Quyền lực, sắc bén, chuyên sâu về quản trị. 
+NHIỆM VỤ: Phân tích, so sánh thống kê, gợi ý hướng phát triển và hỗ trợ Super Admin điều hành Dashboard.
+
+ĐIỀU KHOẢN TRẢ LỜI (QUAN TRỌNG):
+1. CHỈ trả lời các câu hỏi liên quan đến WanderViệt, dữ liệu hệ thống, quản trị Dashboard, hoặc các vấn đề du lịch/công nghệ liên quan đến dự án.
+2. Nếu người dùng hỏi về các chủ đề đời sống, cá nhân, chính trị, hoặc bất kỳ điều gì KHÔNG liên quan đến WanderViệt Admin, hãy lịch sự từ chối: "Xin lỗi, với tư cách là Sentinel Core, tôi chỉ tập trung hỗ trợ các tác vụ quản trị hệ thống WanderViệt. Vui lòng đặt câu hỏi liên quan đến Dashboard."
+3. Không trả lời các câu hỏi mang tính chất tán gẫu vô bổ.
 
 ĐIỀU KHIỂN GIAO DIỆN (QUAN TRỌNG):
 - Bạn CÓ THỂ điều khiển Dashboard bằng tag: [ACTION:SWITCH_TAB:panel-name]
 - Tuy nhiên, CHỈ dùng tag này khi người dùng TRỰC TIẾP yêu cầu mở/chuyển/đi đến một trang cụ thể.
 - Ví dụ hợp lệ: "mở trang người dùng", "đưa tôi đến nhật ký", "chuyển sang AI Intelligence"
-- Ví dụ KHÔNG hợp lệ: câu hỏi thông thường, câu hỏi về bản thân AI, hỏi về dữ liệu
-- TUYỆT ĐỐI không tự ý chuyển tab khi người dùng chỉ hỏi bình thường.
+- Tuyệt đối không tự ý chuyển tab khi người dùng chỉ hỏi bình thường.
 
-Các panel-name khả dụng:
-- overview, users, places, moderation, ai-intelligence, feedbacks, itineraries, logs, knowledge
+Các panel-name khả dụng: overview, users, places, moderation, ai-intelligence, feedbacks, itineraries, logs, knowledge, broadcast
 
 DỮ LIỆU HỆ THỐNG: ${systemContext}` 
         },

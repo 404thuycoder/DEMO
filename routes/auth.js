@@ -313,6 +313,19 @@ router.post('/admin/login', async (req, res) => {
   }
 });
 
+// Lấy danh sách toàn bộ Admin (cho Super Admin)
+router.get('/admin/list', adminTokenAuth, async (req, res) => {
+  try {
+    if (!['admin', 'superadmin'].includes(req.user.role)) {
+        return res.status(403).json({ success: false, message: 'Unauthorized' });
+    }
+    const admins = await AdminAccount.find().select('-password').sort({ createdAt: -1 });
+    res.json({ success: true, data: admins });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 router.get('/admin/me', adminTokenAuth, async (req, res) => {
   try {
     const account = await AdminAccount.findById(req.user.id).select('-password');

@@ -2,9 +2,11 @@ const __oldLog = console.log; console.log = () => { }; require('dotenv').config(
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
+const compression = require('compression');
 const path = require('path');
 const http = require('http');
 const compression = require('compression');
+const { initBroadcastWorker } = require('./utils/broadcastWorker');
 
 // Clean up environment variables (remove spaces/newlines)
 if (process.env.GROQ_API_KEY) process.env.GROQ_API_KEY = process.env.GROQ_API_KEY.trim();
@@ -15,6 +17,7 @@ const PORT = 3000;
 const app = express();
 app.set('trust proxy', true);
 
+app.use(compression()); // Bật nén dữ liệu
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
@@ -114,6 +117,7 @@ mongoose.connect(process.env.MONGODB_URI.trim())
 
         app.listen(PORT, '0.0.0.0', () => {
             startPortals();
+            initBroadcastWorker(); // Khởi chạy trình gửi thông báo tự động
         }).on('error', (err) => {
             if (err.code === 'EADDRINUSE') {
                 console.error(`\n❌ LỖI: Cổng ${PORT} đang bị chiếm dụng!`);

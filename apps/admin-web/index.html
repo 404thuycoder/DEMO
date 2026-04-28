@@ -15,7 +15,20 @@
   <link rel="stylesheet" href="admin.css?v=202604240718" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="SharedUI.js?v=1776819067174"></script>
-</head>
+    <style>
+      .chart-container {
+        width: 100%;
+        height: 500px;
+        position: relative;
+      }
+      .overview-grid {
+        display: grid;
+        grid-template-columns: 400px 1fr;
+        gap: 1.5rem;
+        width: 100%;
+      }
+    </style>
+  </head>
 
 <body class="admin-body">
   <!-- Premium Welcome Overlay -->
@@ -154,44 +167,72 @@
           <p class="admin-sidebar__desc">Cổng quản trị tối cao</p>
         </div>
         <nav class="sidebar-nav" role="tablist">
-          <button type="button" class="sidebar-btn is-active" data-admin-tab="overview">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-            Tổng quan
-          </button>
-          <button type="button" class="sidebar-btn" data-admin-tab="moderation">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-            Duyệt nội dung 
-            <span class="badge-count" id="badge-pending-count" hidden>0</span>
-          </button>
-          <button type="button" class="sidebar-btn" data-admin-tab="ai-intelligence">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8z"/><path d="M12 6a6 6 0 1 0 6 6 6 6 0 0 0-6-6zm0 10a4 4 0 1 1 4-4 4 4 0 0 1-4 4z"/></svg>
-            Trí tuệ AI
-            <span class="badge-ai-new">NEW</span>
-          </button>
-          <button type="button" class="sidebar-btn" data-admin-tab="users">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-            Người dùng
-          </button>
-          <button type="button" class="sidebar-btn" data-admin-tab="broadcast">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.3 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10l-3.1 3.1a2 2 0 0 1-1.4.6H10.3z"/><path d="M15 8h.01"/><path d="M10 8h.01"/><path d="M7 8h.01"/><path d="M7 12h10"/><path d="M7 16h6"/></svg>
-            Gửi thông báo
-          </button>
-          <button type="button" class="sidebar-btn" data-admin-tab="logs">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-            Nhật ký hệ thống
-          </button>
-          <button type="button" class="sidebar-btn" data-admin-tab="places">
-             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-             Kho địa điểm
-          </button>
-          <button type="button" class="sidebar-btn" data-admin-tab="admin-management">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><path d="M20 8v6"/><path d="M23 11h-6"/></svg>
-            Quản lý Admin
-          </button>
-          <button type="button" class="sidebar-btn" data-admin-tab="knowledge">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
-            Dữ liệu AI
-          </button>
+          <!-- NHÓM: ĐIỀU HÀNH & PHÂN TÍCH -->
+          <div class="sidebar-group">
+            <h3 class="sidebar-group-title">Điều hành & Phân tích</h3>
+            <button type="button" class="sidebar-btn is-active" data-admin-tab="overview">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+              Tổng quan
+            </button>
+            <button type="button" class="sidebar-btn" data-admin-tab="analytics">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+              Biểu đồ & Thống kê
+            </button>
+          </div>
+
+          <!-- NHÓM: QUẢN LÝ TÀI KHOẢN -->
+          <div class="sidebar-group">
+            <h3 class="sidebar-group-title">Quản lý Tài khoản</h3>
+            <button type="button" class="sidebar-btn" data-admin-tab="users">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+              Người dùng
+            </button>
+            <button type="button" class="sidebar-btn" data-admin-tab="admins">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><path d="M20 8v6"/><path d="M23 11h-6"/></svg>
+              Quản trị viên
+            </button>
+          </div>
+
+          <!-- NHÓM: QUẢN LÝ NỘI DUNG -->
+          <div class="sidebar-group">
+            <h3 class="sidebar-group-title">Nội dung & Dữ liệu</h3>
+            <button type="button" class="sidebar-btn" data-admin-tab="places">
+               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+               Kho địa điểm
+            </button>
+            <button type="button" class="sidebar-btn" data-admin-tab="moderation">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+              Duyệt nội dung 
+              <span class="badge-count" id="badge-pending-count" hidden>0</span>
+            </button>
+          </div>
+
+          <!-- NHÓM: CHIẾN DỊCH & TĂNG TRƯỞNG -->
+          <div class="sidebar-group">
+            <h3 class="sidebar-group-title">Chiến dịch & Tăng trưởng</h3>
+            <button type="button" class="sidebar-btn" data-admin-tab="campaigns">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+              Quản lý Chiến dịch
+              <span class="badge-ai-new">HOT</span>
+            </button>
+            <button type="button" class="sidebar-btn" data-admin-tab="vouchers">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="7" y1="15" x2="7.01" y2="15"/><line x1="12" y1="15" x2="12.01" y2="15"/><line x1="17" y1="15" x2="17.01" y2="15"/></svg>
+              Mã khuyến mãi
+            </button>
+          </div>
+
+          <!-- NHÓM: HỆ THỐNG -->
+          <div class="sidebar-group">
+            <h3 class="sidebar-group-title">Công cụ Hệ thống</h3>
+            <button type="button" class="sidebar-btn" data-admin-tab="broadcast">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.3 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10l-3.1 3.1a2 2 0 0 1-1.4.6H10.3z"/><path d="M15 8h.01"/><path d="M10 8h.01"/><path d="M7 8h.01"/><path d="M7 12h10"/><path d="M7 16h6"/></svg>
+              Gửi thông báo
+            </button>
+            <button type="button" class="sidebar-btn" data-admin-tab="logs">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+              Nhật ký hệ thống
+            </button>
+          </div>
           
           <div class="sidebar-divider"></div>
           
@@ -424,239 +465,455 @@
           <!-- Backdrop for modals/drawers -->
           <div id="admin-modal-backdrop" class="modal-backdrop" hidden onclick="WanderUI.closeAllDrawers()"></div>
 
-          <!-- ===== OVERVIEW PANEL — EVERYTHING HOME PAGE GOES HERE ===== -->
+          <!-- ===== OVERVIEW PANEL — TRANG CHỦ ADMIN ===== -->
           <section id="panel-overview" class="admin-panel">
             <div id="overview-shell">
-              <!-- Sleek AI Insight Bar -->
+
+              <!-- AI Insight Bar -->
               <div id="ai-insight-bar" class="ai-insight-bar">
                 <span class="ai-insight-icon">✨</span>
                 <span class="ai-insight-label">AI Insight</span>
                 <p id="ai-insight-msg">Đang phân tích dữ liệu hệ thống...</p>
               </div>
 
+              <!-- Header -->
               <div class="panel-header-top">
-                <div class="header-left">
-                  <h1 class="main-title" style="cursor:pointer" onclick="document.querySelector('.sidebar-btn[data-admin-tab=\'overview\']').click()">Tổng quan hệ thống</h1>
-                </div>
-                <p class="main-subtitle">Chào mừng trở lại, đây là những gì đang diễn ra hôm nay.</p>
-                
-                <!-- Quick Actions -->
-                <div class="quick-actions" style="margin-top:1rem;">
-                  <button class="quick-action-btn" data-admin-tab="users">👥 Người dùng</button>
-                  <button class="quick-action-btn" data-admin-tab="places">📍 Điểm đến</button>
-                  <button class="quick-action-btn" data-admin-tab="moderation">✅ Duyệt nội dung</button>
-                  <button class="quick-action-btn" data-admin-tab="logs">📜 Nhật ký</button>
-                </div>
-              </div>
-
-              <!-- Key Stats Row -->
-
-              <div class="stats-row" id="admin-stats" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.5rem; margin-bottom: 2rem;">
-                <div class="stat-card stat-card--blue"><div class="stat-icon-wrap">👥</div><div class="stat-data"><div class="stat-label">Tổng Người Dùng</div><div class="stat-val" id="stat-total-users">—</div></div></div>
-                <div class="stat-card stat-card--green"><div class="stat-icon-wrap">🏨</div><div class="stat-data"><div class="stat-label">Doanh Nghiệp</div><div class="stat-val" id="stat-total-biz">—</div></div></div>
-                <div class="stat-card stat-card--purple"><div class="stat-icon-wrap">⚡</div><div class="stat-data"><div class="stat-label">Tương Tác</div><div class="stat-val" id="stat-daily-interactions">—</div></div></div>
-                <div class="stat-card stat-card--yellow"><div class="stat-icon-wrap">✨</div><div class="stat-data"><div class="stat-label">Lịch trình AI</div><div class="stat-val" id="stat-total-iti">—</div></div></div>
-              </div>
-
-              <!-- Main Charts Grid -->
-              <div class="overview-grid">
-                <div class="overview-left">
-                  <div class="glass-panel chart-box">
-                    <div class="chart-header" style="margin-bottom:1rem"><h3>📊 Phân bổ Thành viên</h3></div>
-                    <div class="chart-container" style="height: 250px;"><canvas id="distributionChart"></canvas></div>
-                  </div>
-                </div>
-
-                <div class="overview-center">
-                  <div class="glass-panel" style="height: 100%;">
-                    <div class="chart-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
-                      <h3>⏱️ Nhật ký mới</h3>
-                      <button class="btn-text-v2" onclick="document.querySelector('[data-admin-tab=\'logs\']').click()">Tất cả <i class="fas fa-chevron-right"></i></button>
-                    </div>
-                    <div class="realtime-logs" id="admin-mini-logs" style="max-height: 300px; overflow-y: auto;">
-                      <div style="text-align:center;padding:2rem;color:var(--admin-text-muted);">Đang tải...</div>
-                    </div>
-                  </div>
-                </div>
-
-                <div class="overview-right">
-                  <div class="glass-panel chart-box">
-                    <div class="chart-header" style="margin-bottom:1rem"><h3>📈 Tương tác hệ thống</h3></div>
-                    <div class="chart-container" style="height: 250px;"><canvas id="activityChart"></canvas></div>
+                <div style="display:flex; justify-content: space-between; align-items: flex-end; margin-bottom: 1.5rem;">
+                  <div>
+                    <h1 class="main-title">Tổng quan hệ thống</h1>
+                    <p class="main-subtitle" style="margin-bottom:0">Theo dõi trạng thái và hiệu suất của WanderViệt trong thời gian thực.</p>
                   </div>
                 </div>
               </div>
-              
-              <!-- Geographic Pulse / Key Regions -->
-              <div class="glass-panel" style="margin: 1.5rem 0; box-shadow: 0 12px 40px rgba(0,0,0,0.3);">
-                <div class="chart-box__header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem">
-                  <h3 style="margin:0; font-size:1.1rem; font-weight:700; color:var(--admin-text)">📍 VÙNG DU LỊCH TRỌNG ĐIỂM</h3>
-                  <span class="badge-ai" style="background:rgba(16, 185, 129, 0.1); color:#10b981; border:1px solid rgba(16,185,129,0.2); padding:4px 10px; border-radius:20px; font-size:0.65rem; font-weight:800;">LIVE PULSE</span>
+
+              <!-- ── SECTION 1: Thống kê nhanh ── -->
+              <div style="margin-bottom: 2.5rem;">
+                <div class="stats-row" id="admin-stats" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.5rem; margin-bottom: 2rem;">
+                  <div class="stat-card stat-card--blue"><div class="stat-icon-wrap">👥</div><div class="stat-data"><div class="stat-label">Tổng Người Dùng</div><div class="stat-val" id="stat-total-users">—</div></div></div>
+                  <div class="stat-card stat-card--green"><div class="stat-icon-wrap">🏨</div><div class="stat-data"><div class="stat-label">Doanh Nghiệp</div><div class="stat-val" id="stat-total-biz">—</div></div></div>
+                  <div class="stat-card stat-card--purple"><div class="stat-icon-wrap">⚡</div><div class="stat-data"><div class="stat-label">Tương Tác</div><div class="stat-val" id="stat-daily-interactions">—</div></div></div>
+                  <div class="stat-card stat-card--yellow"><div class="stat-icon-wrap">✨</div><div class="stat-data"><div class="stat-label">Lịch trình AI</div><div class="stat-val" id="stat-total-iti">—</div></div></div>
                 </div>
-                <div id="geo-pulse-list" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem;">
-                  <!-- Miền Bắc -->
-                  <div class="geo-item">
-                    <div class="geo-item-header">
-                      <span>Miền Bắc (Hà Nội, Sa Pa...)</span>
-                      <span class="geo-val">42%</span>
-                    </div>
-                    <div class="geo-progress-bg">
-                      <div class="geo-progress-bar bar--blue" style="width: 42%;"></div>
-                    </div>
+
+                <!-- Vùng du lịch -->
+                <div class="glass-panel" style="margin: 1.5rem 0; box-shadow: 0 12px 40px rgba(0,0,0,0.3);">
+                  <div class="chart-box__header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem">
+                    <h3 style="margin:0; font-size:1.1rem; font-weight:700; color:var(--admin-text)">📍 VÙNG DU LỊCH TRỌNG ĐIỂM</h3>
+                    <span class="badge-ai" style="background:rgba(16, 185, 129, 0.1); color:#10b981; border:1px solid rgba(16,185,129,0.2); padding:4px 10px; border-radius:20px; font-size:0.65rem; font-weight:800;">LIVE PULSE</span>
                   </div>
-                  <!-- Miền Trung -->
-                  <div class="geo-item">
-                    <div class="geo-item-header">
-                      <span>Miền Trung (Đà Nẵng, Hội An...)</span>
-                      <span class="geo-val val--yellow">35%</span>
-                    </div>
-                    <div class="geo-progress-bg">
-                      <div class="geo-progress-bar bar--yellow" style="width: 35%;"></div>
-                    </div>
+                  <div id="geo-pulse-list" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem;">
+                    <div class="geo-item"><div class="geo-item-header"><span>Miền Bắc</span><span class="geo-val">42%</span></div><div class="geo-progress-bg"><div class="geo-progress-bar bar--blue" style="width: 42%;"></div></div></div>
+                    <div class="geo-item"><div class="geo-item-header"><span>Miền Trung</span><span class="geo-val val--yellow">35%</span></div><div class="geo-progress-bg"><div class="geo-progress-bar bar--yellow" style="width: 35%;"></div></div></div>
+                    <div class="geo-item"><div class="geo-item-header"><span>Miền Nam</span><span class="geo-val val--green">23%</span></div><div class="geo-progress-bg"><div class="geo-progress-bar bar--green" style="width: 23%;"></div></div></div>
                   </div>
-                  <!-- Miền Nam -->
-                  <div class="geo-item">
-                    <div class="geo-item-header">
-                      <span>Miền Nam (TP.HCM, Phú Quốc...)</span>
-                      <span class="geo-val val--green">23%</span>
-                    </div>
-                    <div class="geo-progress-bg">
-                      <div class="geo-progress-bar bar--green" style="width: 23%;"></div>
+                </div>
+
+              </div>
+
+              <!-- ── SECTION 2: Live Feed ── -->
+              <div style="margin-bottom: 2.5rem;">
+                <!-- Realtime Logs -->
+                <div class="glass-panel" style="margin-bottom: 1.5rem;">
+                  <div class="chart-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem;">
+                    <h3>⏱️ Luồng Nhật ký Hệ thống (Thời gian thực)</h3>
+                    <span class="badge-ai" style="background:rgba(59, 130, 246, 0.1); color:#38bdf8; border:1px solid rgba(59,130,246,0.2); padding:4px 10px; border-radius:20px; font-size:0.65rem; font-weight:800;">LIVE FEED</span>
+                  </div>
+                  <div class="realtime-logs" id="admin-mini-logs" style="max-height: 500px; overflow-y: auto;">
+                    <div style="text-align:center;padding:4rem;color:var(--admin-text-muted);">Khởi tạo luồng dữ liệu...</div>
+                  </div>
+                </div>
+
+                <!-- Activity Stream Ticker -->
+                <div class="glass-panel activity-stream-container">
+                  <div style="display:flex; align-items:center; gap:1rem;">
+                    <div class="stream-label"><span class="pulse-dot"></span> LIVE_ACTIVITY_STREAM</div>
+                    <div id="live-activity-stream" class="activity-stream-inner">
+                      <span class="stream-placeholder">Connecting to global stream...</span>
                     </div>
                   </div>
                 </div>
               </div>
 
-              <!-- Leaderboards Section -->
-              <div class="leaderboard-section-header">
-                <h2 class="section-title">Bảng Xếp Hạng Hệ Thống</h2>
-                <div class="period-filter">
-                  <button class="btn-period is-active" data-period="today">Hôm nay</button>
-                  <button class="btn-period" data-period="alltime">Tất cả</button>
+              <!-- ── SECTION 3: Bảng xếp hạng (cuối trang) ── -->
+              <div style="margin-bottom: 2.5rem;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem;">
+                  <h2 style="margin:0; font-size:1.3rem; font-weight:800; color:var(--admin-text);">🏆 Bảng xếp hạng Hiệu suất</h2>
+                  <div class="btn-group">
+                    <button class="btn-period is-active" data-period="today">Hôm nay</button>
+                    <button class="btn-period" data-period="week">Tuần này</button>
+                    <button class="btn-period" data-period="month">Tháng này</button>
+                    <button class="btn-period" data-period="alltime">Tất cả</button>
+                  </div>
+                </div>
+                <div class="rankings-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem;">
+                  <div class="glass-panel">
+                    <div class="chart-header">
+                      <h3>⏳ Top Hoạt động</h3>
+                      <button class="btn-view-more-sm" data-type="active">Xem thêm</button>
+                    </div>
+                    <div class="leaderboard-list" id="rank-active-list"></div>
+                  </div>
+                  <div class="glass-panel">
+                    <div class="chart-header">
+                      <h3>📅 Top Lịch trình</h3>
+                      <button class="btn-view-more-sm" data-type="itineraries">Xem thêm</button>
+                    </div>
+                    <div class="leaderboard-list" id="rank-experience-list"></div>
+                  </div>
+                  <div class="glass-panel">
+                    <div class="chart-header">
+                      <h3>💰 Top Nạp tiền</h3>
+                      <button class="btn-view-more-sm" data-type="deposits">Xem thêm</button>
+                    </div>
+                    <div class="leaderboard-list" id="rank-deposits-list"></div>
+                  </div>
+                  <div class="glass-panel">
+                    <div class="chart-header">
+                      <h3>🏨 Top Doanh nghiệp</h3>
+                      <button class="btn-view-more-sm" data-type="businesses">Xem thêm</button>
+                    </div>
+                    <div class="leaderboard-list" id="rank-businesses-list"></div>
+                  </div>
+                  <div class="glass-panel">
+                    <div class="chart-header">
+                      <h3>📍 Top Địa điểm</h3>
+                      <button class="btn-view-more-sm" data-type="places">Xem thêm</button>
+                    </div>
+                    <div class="leaderboard-list" id="rank-places-list"></div>
+                  </div>
                 </div>
               </div>
 
-              <div class="overview-grid grid-4">
-                <div class="glass-panel">
-                  <div class="chart-header" style="margin-bottom:1rem"><h3>⏳ Top Hoạt động</h3></div>
-                  <div class="leaderboard-list" id="rank-active-list"></div>
-                  <div class="view-more-container" style="margin-top:1rem; text-align:right;">
-                    <button class="btn-view-more" data-type="active" style="background:transparent; border:none; color:var(--admin-primary); cursor:pointer; font-size:0.85rem;">Xem thêm <i class="fas fa-chevron-right"></i></button>
-                  </div>
+              <!-- ── SECTION 4: Trạng thái hệ thống (cuối cùng) ── -->
+              <div style="margin-bottom: 1.5rem;">
+                <div class="glass-panel health-row" style="display: flex; justify-content: space-around; padding: 1.25rem; align-items: center; margin-bottom: 1rem;">
+                  <div class="health-item"><span class="health-dot health-dot--live"></span> Hệ thống: <span id="health-status" class="health-val">Online</span></div>
+                  <div class="health-item">Database: <span id="health-db" class="health-val">Connected</span></div>
+                  <div class="health-item">Độ trễ: <span id="health-latency" class="health-val val--blue">--ms</span></div>
+                  <div class="health-item">Uptime: <span id="health-uptime" class="health-val">--s</span></div>
                 </div>
-
-                <div class="glass-panel">
-                  <div class="chart-header" style="margin-bottom:1rem"><h3>📅 Top Lịch trình</h3></div>
-                  <div class="leaderboard-list" id="rank-experience-list"></div>
-                  <div class="view-more-container" style="margin-top:1rem; text-align:right;">
-                    <button class="btn-view-more" data-type="itineraries" style="background:transparent; border:none; color:var(--admin-primary); cursor:pointer; font-size:0.85rem;">Xem thêm <i class="fas fa-chevron-right"></i></button>
-                  </div>
-                </div>
-
-                <div class="glass-panel">
-                  <div class="chart-header" style="margin-bottom:1rem"><h3>🏨 Top Doanh nghiệp</h3></div>
-                  <div class="leaderboard-list" id="rank-businesses-list"></div>
-                  <div class="view-more-container" style="margin-top:1rem; text-align:right;">
-                    <button class="btn-view-more" data-type="businesses" style="background:transparent; border:none; color:var(--admin-primary); cursor:pointer; font-size:0.85rem;">Xem thêm <i class="fas fa-chevron-right"></i></button>
-                  </div>
-                </div>
-
-                <div class="glass-panel">
-                  <div class="chart-header" style="margin-bottom:1rem"><h3>📍 Top Địa điểm</h3></div>
-                  <div class="leaderboard-list" id="rank-places-list"></div>
-                  <div class="view-more-container" style="margin-top:1rem; text-align:right;">
-                    <button class="btn-view-more" data-type="places" style="background:transparent; border:none; color:var(--admin-primary); cursor:pointer; font-size:0.85rem;">Xem thêm <i class="fas fa-chevron-right"></i></button>
+                <div class="glass-panel" style="padding: 1rem; display: flex; gap: 2rem; align-items: center; justify-content: center; background: rgba(0,0,0,0.15); border: 1px solid rgba(255,255,255,0.03);">
+                  <div style="display: flex; align-items: center; gap: 0.75rem;">
+                    <span style="font-size: 0.7rem; color: var(--admin-text-muted); text-transform: uppercase; font-weight: 800;">CPU Load</span>
+                    <div style="width: 100px; height: 6px; background: rgba(255,255,255,0.05); border-radius: 3px; overflow: hidden;">
+                      <div id="cpu-bar" style="width: 12%; height: 100%; background: linear-gradient(90deg, #38bdf8, #818cf8); transition: width 0.5s;"></div>
+                    </div>
+                    <span id="cpu-val" style="font-size: 0.8rem; font-family: monospace; color: #38bdf8; min-width: 30px;">12%</span>
                   </div>
                 </div>
               </div>
+
             </div><!-- /overview-shell -->
+          </section>
 
-            <!-- Live Command Activity Stream (High-Tech Ticker) -->
-            <div class="glass-panel activity-stream-container">
-              <div style="display:flex; align-items:center; gap:1rem;">
-                <div class="stream-label">
-                  <span class="pulse-dot"></span>
-                  LIVE_ACTIVITY_STREAM
+          <!-- Floating Ranking Detail Drawer -->
+          <div class="slide-drawer" id="rankings-drawer" hidden onclick="if(event.target === this) closeRankingsDrawer()">
+            <div class="slide-drawer__inner">
+              <div class="slide-drawer__header">
+                <h2 class="slide-drawer__title" id="drawer-rank-title">Bảng Xếp Hạng Chi Tiết</h2>
+                <button class="slide-drawer__close-x" onclick="closeRankingsDrawer()">&#x00D7;</button>
+              </div>
+              <div class="slide-drawer__body">
+                <div class="leaderboard-list leaderboard-list--full" id="drawer-rank-content">
+                  <!-- Cards will load here -->
                 </div>
-                <div id="live-activity-stream" class="activity-stream-inner">
-                  <span class="stream-placeholder">Initializing secure connection to global activity stream...</span>
+              </div>
+              <div class="slide-drawer__footer">
+                <button class="btn-popup-close" onclick="closeRankingsDrawer()">Đóng</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- ===== ANALYTICS PANEL ===== -->
+          <section id="panel-analytics" class="admin-panel" hidden>
+
+            <div class="panel-header-top">
+              <div style="display:flex; justify-content: space-between; align-items: flex-end; margin-bottom: 1.5rem;">
+                <div>
+                  <h1 class="main-title">Biểu đồ &amp; Thống kê</h1>
+                  <p class="main-subtitle" style="margin-bottom:0">Phân tích chuyên sâu về dữ liệu hệ thống, người dùng và hiệu suất.</p>
+                </div>
+              </div>
+
+              <div class="panel-hub-nav">
+                <button class="hub-btn is-active" data-hub-tab="analytics-system" data-parent-panel="analytics">
+                  <i class="fas fa-microchip"></i> Hệ thống
+                </button>
+                <button class="hub-btn" data-hub-tab="analytics-users" data-parent-panel="analytics">
+                  <i class="fas fa-user-chart"></i> Người dùng
+                </button>
+                <button class="hub-btn" data-hub-tab="analytics-places" data-parent-panel="analytics">
+                  <i class="fas fa-map-marked-alt"></i> Điểm đến
+                </button>
+                <button class="hub-btn" data-hub-tab="analytics-logs" data-parent-panel="analytics">
+                  <i class="fas fa-history"></i> Nhật ký
+                </button>
+                <button class="hub-btn" data-hub-tab="analytics-ai" data-parent-panel="analytics">
+                  <i class="fas fa-brain"></i> Trí tuệ AI
+                </button>
+              </div>
+            </div>
+
+
+            <div id="sub-panel-analytics-system" class="sub-panel">
+              <!-- Advanced Metric Grid -->
+              <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1.5rem;">
+                <div class="metric-card-pro">
+                  <div class="metric-icon" style="background: rgba(99, 102, 241, 0.1); color: #818cf8;"><i class="fas fa-users"></i></div>
+                  <div class="metric-info">
+                    <span class="metric-label">Người dùng mới</span>
+                    <div class="metric-row">
+                      <span class="metric-value">+124</span>
+                      <span class="metric-trend up"><i class="fas fa-caret-up"></i> 12%</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="metric-card-pro">
+                  <div class="metric-icon" style="background: rgba(16, 185, 129, 0.1); color: #10b981;"><i class="fas fa-map-marker-alt"></i></div>
+                  <div class="metric-info">
+                    <span class="metric-label">Điểm đến mới</span>
+                    <div class="metric-row">
+                      <span class="metric-value">42</span>
+                      <span class="metric-trend up"><i class="fas fa-caret-up"></i> 5%</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="metric-card-pro">
+                  <div class="metric-icon" style="background: rgba(245, 158, 11, 0.1); color: #f59e0b;"><i class="fas fa-star"></i></div>
+                  <div class="metric-info">
+                    <span class="metric-label">Đánh giá 5 sao</span>
+                    <div class="metric-row">
+                      <span class="metric-value">85%</span>
+                      <span class="metric-trend up"><i class="fas fa-caret-up"></i> 3%</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="metric-card-pro">
+                  <div class="metric-icon" style="background: rgba(239, 68, 68, 0.1); color: #ef4444;"><i class="fas fa-bolt"></i></div>
+                  <div class="metric-info">
+                    <span class="metric-label">Độ trễ trung bình</span>
+                    <div class="metric-row">
+                      <span class="metric-value">124ms</span>
+                      <span class="metric-trend down"><i class="fas fa-caret-down"></i> 8%</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+
+              <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 1.5rem;">
+                <!-- Hero Activity Chart -->
+                <div class="glass-panel chart-box-pro">
+                  <div class="chart-header-pro">
+                    <div style="display:flex; flex-direction:column; gap:0.25rem">
+                      <h3 style="margin:0; font-size:1.1rem; color:#fff">📈 Tương tác & Hoạt động</h3>
+                      <p style="margin:0; font-size:0.75rem; color:var(--admin-text-muted)">Phân tích lưu lượng truy cập theo thời gian thực</p>
+                    </div>
+                    <div class="chart-actions">
+                       <select class="chart-period-select-pro" id="main-activity-period">
+                         <option value="hour">Hôm nay</option>
+                         <option value="week" selected>Tuần này</option>
+                         <option value="day">Tháng này</option>
+                         <option value="month">Năm nay</option>
+                       </select>
+                    </div>
+                  </div>
+                  <div class="chart-main-container" style="height: 400px; margin-top: 1.5rem;">
+                    <canvas id="activityChart"></canvas>
+                  </div>
+                </div>
+
+                <!-- Side Distribution Column -->
+                <div style="display:flex; flex-direction:column; gap:1.5rem;">
+                  <div class="glass-panel chart-box-pro small">
+                    <h4 class="chart-title-small">📊 Phân bổ Thành viên</h4>
+                    <div style="height: 180px;"><canvas id="distributionChart"></canvas></div>
+                  </div>
+                  <div class="glass-panel chart-box-pro small">
+                    <h4 class="chart-title-small">📱 Thiết bị truy cập</h4>
+                    <div style="height: 180px;"><canvas id="deviceChart"></canvas></div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Secondary Row -->
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-top: 1.5rem;">
+                 <div class="glass-panel chart-box-pro">
+                    <h4 class="chart-title-small">⭐ Đánh giá Phản hồi</h4>
+                    <div style="height: 250px;"><canvas id="sentimentChart"></canvas></div>
+                 </div>
+                 <div class="glass-panel chart-box-pro" style="display:flex; flex-direction:column; justify-content:center; align-items:center; position:relative; overflow:hidden">
+                    <div style="position:absolute; top:0; left:0; width:100%; height:100%; background: radial-gradient(circle at 50% 50%, rgba(99, 102, 241, 0.1) 0%, transparent 70%);"></div>
+                    <div style="z-index:1; text-align:center">
+                      <div class="pulse-ring"></div>
+                      <h2 style="font-size:3rem; margin:0; font-weight:800; color:#fff; text-shadow: 0 0 20px rgba(99,102,241,0.5)">98.2%</h2>
+                      <p style="color:var(--admin-text-muted); text-transform:uppercase; letter-spacing:2px; font-size:0.7rem; font-weight:700">Chỉ số ổn định hệ thống</p>
+                    </div>
+                 </div>
+              </div>
+            </div>
+
+            <!-- SUB-PANEL: User Analytics -->
+            <div id="sub-panel-analytics-users" class="sub-panel is-hidden">
+              <div id="user-manager-dashboard" class="glass-panel" style="padding: 1.5rem;">
+                <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 2rem;">
+                  <div class="stat-card-v2">
+                    <div class="stat-val" id="um-total-users">—</div>
+                    <div class="stat-label">Tổng Thành Viên</div>
+                  </div>
+                  <div class="stat-card-v2">
+                    <div class="stat-val" id="um-new-today">—</div>
+                    <div class="stat-label">Đăng ký hôm nay</div>
+                  </div>
+                  <div class="stat-card-v2">
+                    <div class="stat-val" id="um-businesses">—</div>
+                    <div class="stat-label">Doanh nghiệp</div>
+                  </div>
+                  <div class="stat-card-v2">
+                    <div class="stat-val" id="um-suspended">—</div>
+                    <div class="stat-label">Bị khóa</div>
+                  </div>
+                </div>
+                <div class="chart-header" style="display:flex; justify-content: space-between; align-items: center; margin-bottom:1.5rem">
+                  <h3>📈 Tăng trưởng Người dùng & Đối tác</h3>
+                  <div class="chart-controls">
+                      <select class="chart-period-select" data-chart="users">
+                        <option value="hour" selected>Ngày</option>
+                        <option value="week">Tuần</option>
+                        <option value="day">Tháng</option>
+                        <option value="month">Năm</option>
+                      </select>
+                  </div>
+                </div>
+                <div style="height: 650px; position: relative;">
+                  <canvas id="userManagerChart"></canvas>
                 </div>
               </div>
             </div>
 
-            <!-- System Health Row (Restored) -->
-            <div class="overview-grid health-row-grid">
-              <div class="glass-panel health-row">
-                <div class="health-item">
-                  <span class="health-dot health-dot--live"></span>
-                  <span>Hệ thống: <span id="health-status" class="health-val">Online</span></span>
+            <!-- SUB-PANEL: Place Analytics -->
+            <div id="sub-panel-analytics-places" class="sub-panel is-hidden">
+               <div id="place-manager-dashboard" class="glass-panel-v2" style="padding: 1.5rem;">
+                <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                  <h3 style="margin:0; font-size: 1.1rem; color: var(--admin-primary);">🗺️ Phân tích Kho Địa Điểm</h3>
+                  <div class="chart-controls">
+                      <select class="chart-period-select" data-chart="places">
+                        <option value="hour" selected>Ngày</option>
+                        <option value="week">Tuần</option>
+                        <option value="day">Tháng</option>
+                        <option value="month">Năm</option>
+                      </select>
+                  </div>
                 </div>
-                <div class="health-item">Database: <span id="health-db" class="health-val">Connected</span></div>
-                <div class="health-item">Độ trễ API: <span id="health-latency" class="health-val val--blue">--ms</span></div>
-                <div class="health-item">Bộ nhớ: <span id="health-memory" class="health-val val--yellow">--MB</span></div>
-                <div class="health-item">Uptime: <span id="health-uptime" class="health-val">--s</span></div>
+                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1.5rem;">
+                  <div style="text-align:center; padding:1rem; background:rgba(0,0,0,0.2); border-radius:12px; border:1px solid rgba(255,255,255,0.05);">
+                    <div style="font-size:1.8rem; font-weight:800; color:#10b981" id="pm-total-places">—</div>
+                    <div style="font-size:0.8rem; color:var(--admin-text-muted); margin-top:0.2rem;">Tổng Địa Điểm</div>
+                  </div>
+                  <div style="text-align:center; padding:1rem; background:rgba(0,0,0,0.2); border-radius:12px; border:1px solid rgba(255,255,255,0.05);">
+                    <div style="font-size:1.8rem; font-weight:800; color:#38bdf8" id="pm-active-places">—</div>
+                    <div style="font-size:0.8rem; color:var(--admin-text-muted); margin-top:0.2rem;">Đang hoạt động</div>
+                  </div>
+                  <div style="text-align:center; padding:1rem; background:rgba(0,0,0,0.2); border-radius:12px; border:1px solid rgba(255,255,255,0.05);">
+                    <div style="font-size:1.8rem; font-weight:800; color:#f59e0b" id="pm-pending-places">—</div>
+                    <div style="font-size:0.8rem; color:var(--admin-text-muted); margin-top:0.2rem;">Chờ duyệt</div>
+                  </div>
+                  <div style="text-align:center; padding:1rem; background:rgba(0,0,0,0.2); border-radius:12px; border:1px solid rgba(255,255,255,0.05);">
+                    <div style="font-size:1.8rem; font-weight:800; color:#6366f1" id="pm-partner-places">—</div>
+                    <div style="font-size:0.8rem; color:var(--admin-text-muted); margin-top:0.2rem;">Từ Đối tác</div>
+                  </div>
+                </div>
+                <div style="height: 650px; position: relative;">
+                  <canvas id="placeManagerChart"></canvas>
+                </div>
               </div>
+            </div>
+
+            <!-- SUB-PANEL: Log Analytics -->
+            <div id="sub-panel-analytics-logs" class="sub-panel is-hidden">
+               <div id="log-manager-dashboard" class="glass-panel-v2" style="padding: 1.5rem;">
+                <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                  <h3 style="margin:0; font-size: 1.1rem; color: var(--admin-primary);">📜 Phân tích Nhật Ký Hệ Thống</h3>
+                </div>
+                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1.5rem;">
+                  <div style="text-align:center; padding:1rem; background:rgba(0,0,0,0.2); border-radius:12px; border:1px solid rgba(255,255,255,0.05);">
+                    <div style="font-size:1.8rem; font-weight:800; color:#38bdf8" id="lm-total">—</div>
+                    <div style="font-size:0.8rem; color:var(--admin-text-muted); margin-top:0.2rem;">Tổng Log</div>
+                  </div>
+                  <div style="text-align:center; padding:1rem; background:rgba(0,0,0,0.2); border-radius:12px; border:1px solid rgba(255,255,255,0.05);">
+                    <div style="font-size:1.8rem; font-weight:800; color:#6366f1" id="lm-today">—</div>
+                    <div style="font-size:0.8rem; color:var(--admin-text-muted); margin-top:0.2rem;">Hôm nay</div>
+                  </div>
+                  <div style="text-align:center; padding:1rem; background:rgba(0,0,0,0.2); border-radius:12px; border:1px solid rgba(255,255,255,0.05);">
+                    <div style="font-size:1.8rem; font-weight:800; color:#f59e0b" id="lm-admin">—</div>
+                    <div style="font-size:0.8rem; color:var(--admin-text-muted); margin-top:0.2rem;">Hành động Admin</div>
+                  </div>
+                  <div style="text-align:center; padding:1rem; background:rgba(0,0,0,0.2); border-radius:12px; border:1px solid rgba(255,255,255,0.05);">
+                    <div style="font-size:1.8rem; font-weight:800; color:#10b981" id="lm-system">—</div>
+                    <div style="font-size:0.8rem; color:var(--admin-text-muted); margin-top:0.2rem;">Hệ thống</div>
+                  </div>
+                </div>
+                <div style="height: 300px; position: relative;">
+                  <canvas id="logManagerChart"></canvas>
+                </div>
+              </div>
+            </div>
+
+            <!-- SUB-PANEL: AI Analytics (MOVED HERE) -->
+            <div id="sub-panel-analytics-ai" class="sub-panel is-hidden">
+               <div style="display:grid; grid-template-columns: repeat(4,1fr); gap:1.5rem; margin-bottom: 2rem;">
+                <div class="stat-card-v2" style="background: rgba(99, 102, 241, 0.1);">
+                  <div class="stat-val" id="intel-total-itin" style="color:#6366f1">—</div>
+                  <div class="stat-label">Tổng lịch trình AI</div>
+                </div>
+                <div class="stat-card-v2" style="background: rgba(56, 189, 248, 0.1);">
+                  <div class="stat-val" id="intel-real-users" style="color:#38bdf8">—</div>
+                  <div class="stat-label">Người dùng hoạt động</div>
+                </div>
+                <div class="stat-card-v2" style="background: rgba(16, 185, 129, 0.1);">
+                  <div class="stat-val" id="intel-sentiment" style="color:#10b981">—%</div>
+                  <div class="stat-label">Mức độ hài lòng</div>
+                </div>
+                <div class="stat-card-v2" style="background: rgba(245, 158, 11, 0.1);">
+                  <div class="stat-val" id="intel-top-dest" style="color:#f59e0b" style="font-size: 1rem;">—</div>
+                  <div class="stat-label">Điểm đến hàng đầu</div>
+                </div>
+              </div>
+
+              <div class="glass-panel" style="padding:1.5rem;">
+                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:1.5rem;">
+                  <h3 style="margin:0; font-size:1.1rem; color:var(--admin-text);">📈 Xu hướng lịch trình 7 ngày gần nhất</h3>
+                  <div style="display:flex; gap:0.5rem;">
+                    <button class="btn btn--small btn--ghost is-active" id="intel-chart-mode-daily" onclick="switchIntelChart('daily')">Theo ngày</button>
+                    <button class="btn btn--small btn--ghost" id="intel-chart-mode-dest" onclick="switchIntelChart('dest')">Theo điểm đến</button>
+                  </div>
+                </div>
+                <div style="height:350px; position:relative;">
+                  <canvas id="aiTrendChart"></canvas>
+                </div>
+              </div>
+            </div>
+
             </div>
           </section>
 
-          <!-- Floating Ranking Popup (Reference Inspired) -->
-            <div class="slide-drawer" id="rankings-drawer" hidden onclick="if(event.target === this) closeRankingsDrawer()">
-              <div class="slide-drawer__inner">
-                <div class="slide-drawer__header">
-                  <h2 class="slide-drawer__title" id="drawer-rank-title">Bảng Xếp Hạng Chi Tiết</h2>
-                  <button class="slide-drawer__close-x" onclick="closeRankingsDrawer()">&times;</button>
-                </div>
-                <div class="slide-drawer__body">
-                  <div class="leaderboard-list leaderboard-list--full" id="drawer-rank-content">
-                    <!-- Cards will load here -->
-                  </div>
-                </div>
-                <div class="slide-drawer__footer">
-                  <button class="btn-popup-close" onclick="closeRankingsDrawer()">Đóng</button>
-                </div>
-              </div>
-            </div>
-
-            <!-- Backdrop (Lightweight) -->
-          
           <!-- Moderation Panel -->
           <section id="panel-moderation" class="admin-panel glass-panel" hidden>
-            <div class="admin-panel-header">
-              <h2 class="section-title">Hàng đợi Kiểm duyệt</h2>
-              <p class="section-desc">Các địa điểm/dịch vụ do doanh nghiệp mới đăng đang chờ phê duyệt.</p>
+            <div style="display:flex; justify-content: space-between; align-items: flex-end; margin-bottom: 1.5rem;">
+              <div>
+                <h2 class="section-title">Duyệt Quảng Cáo Khách Sạn</h2>
+                <p class="section-desc" style="margin-bottom:0">Quản lý các chiến dịch quảng cáo, bài đăng ưu tiên từ đối tác doanh nghiệp.</p>
+              </div>
             </div>
 
-            <!-- Dashboard Mini cho Duyệt Nội Dung -->
-            <div id="moderation-manager-dashboard" class="glass-panel-v2" style="margin-bottom: 1.5rem; padding: 1.5rem; display: none;">
-              <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                <h3 style="margin:0; font-size: 1.1rem; color: var(--admin-primary);">🛡️ Tổng quan Duyệt Nội Dung</h3>
-                <span class="badge-ai" style="background:rgba(244, 63, 94, 0.1); color:#f43f5e; border:1px solid rgba(244,63,94,0.2); padding:4px 10px; border-radius:20px; font-size:0.65rem; font-weight:800;">PENDING ACTION</span>
-              </div>
-              <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 1.5rem;">
-                <div style="text-align:center; padding:1rem; background:rgba(0,0,0,0.2); border-radius:12px; border:1px solid rgba(255,255,255,0.05);">
-                  <div style="font-size:1.8rem; font-weight:800; color:#f59e0b" id="mm-pending">—</div>
-                  <div style="font-size:0.8rem; color:var(--admin-text-muted); margin-top:0.2rem;">Đang chờ duyệt</div>
-                </div>
-                <div style="text-align:center; padding:1rem; background:rgba(0,0,0,0.2); border-radius:12px; border:1px solid rgba(255,255,255,0.05);">
-                  <div style="font-size:1.8rem; font-weight:800; color:#10b981" id="mm-queue">READY</div>
-                  <div style="font-size:0.8rem; color:var(--admin-text-muted); margin-top:0.2rem;">Đã duyệt xong</div>
-                </div>
-                <div style="text-align:center; padding:1rem; background:rgba(0,0,0,0.2); border-radius:12px; border:1px solid rgba(255,255,255,0.05);">
-                  <div style="font-size:1.8rem; font-weight:800; color:#ef4444" id="mm-urgent">—</div>
-                  <div style="font-size:0.8rem; color:var(--admin-text-muted); margin-top:0.2rem;">Khẩn cấp</div>
-                </div>
-              </div>
-              <div style="height: 180px; position: relative;">
-                <canvas id="moderationManagerChart"></canvas>
-              </div>
-            </div>
+             <!-- Chuyển dashboard sang phần Thống kê -->
             <div class="table-wrap">
               <table class="admin-table">
                 <thead>
                   <tr>
-                    <th style="width:250px">Dịch vụ (Ảnh/Tên)</th>
-                    <th>Chủ sở hữu</th>
-                    <th>Ngày đăng</th>
+                    <th style="width:300px">Chiến dịch (Ảnh/Khách sạn)</th>
+                    <th>Doanh nghiệp / Đối tác</th>
+                    <th>Ngân sách & Thời hạn</th>
                     <th>Trạng thái</th>
                     <th>Hành động</th>
                   </tr>
@@ -746,6 +1003,19 @@
                       </select>
                     </div>
                   </div>
+
+                  <div class="command-line">
+                    <span class="command-prompt">root@wander:~$</span>
+                    <span>schedule --at</span>
+                    <div class="command-input-wrap" style="display: flex; align-items: center; gap: 1rem;">
+                       <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer; font-size:0.85rem">
+                         <input type="checkbox" id="broadcast-is-scheduled" /> <span>ENABLE_SCHEDULER</span>
+                       </label>
+                       <div id="broadcast-schedule-box" style="display:none; align-items:center; gap:0.5rem">
+                         <input type="datetime-local" id="broadcast-scheduled-time" class="command-input" style="width:auto; padding:2px 8px; background:rgba(255,255,255,0.05); color:#fff; border:1px solid rgba(255,255,255,0.1); border-radius:4px" />
+                       </div>
+                    </div>
+                  </div>
                   
                   <button type="submit" class="command-btn" id="btn-send-broadcast">
                     <span>EXECUTE_COMMAND --push</span>
@@ -753,120 +1023,114 @@
                   </button>
                 </form>
               </div>
+            <!-- Broadcast History -->
+            <div style="margin-top: 2.5rem; padding-top: 2rem; border-top: 1px solid rgba(255,255,255,0.05);">
+              <h3 class="section-title" style="font-size: 1.1rem; margin-bottom: 1rem;">📜 Lịch sử & Hẹn giờ phát thông báo</h3>
+              <div class="table-wrap">
+                <table class="admin-table">
+                  <thead>
+                    <tr>
+                      <th style="width:180px">Thời điểm</th>
+                      <th>Tiêu đề thông báo</th>
+                      <th>Đối tượng</th>
+                      <th>Trạng thái</th>
+                      <th>Hành động</th>
+                    </tr>
+                  </thead>
+                  <tbody id="broadcast-history-tbody">
+                    <tr><td colspan="5" style="text-align:center;padding:2rem;color:var(--admin-text-muted)">Chưa có dữ liệu...</td></tr>
+                  </tbody>
+                </table>
+              </div>
             </div>
           </section>
 
           <!-- Users Panel -->
-          <section id="panel-users" class="admin-panel glass-panel" hidden>
-            <div class="admin-panel-header">
-              <div style="flex:1">
-                <h2 class="section-title" style="font-size:1.4rem;margin:0">Danh sách Người dùng / Đối tác</h2>
-                <div class="bulk-actions" style="margin-top:0.5rem; display:flex; gap:0.5rem;">
-                   <button class="btn btn--small btn--ghost" onclick="WanderUI.exportToCSV('users')">📥 Xuất báo cáo CSV</button>
-                   <button class="btn btn--small btn--ghost" onclick="WanderToast.warn('Chức năng chọn nhiều đang được phát triển')">🔒 Khóa hàng loạt</button>
+          <section id="panel-users" class="admin-panel" hidden>
+            <div class="panel-header-top">
+              <div style="display:flex; justify-content: space-between; align-items: flex-end; margin-bottom: 1.5rem;">
+                <div>
+                  <h1 class="main-title">Quản lý người dùng</h1>
+                  <p class="main-subtitle" style="margin-bottom:0">Quản lý thành viên, đối tác và phân quyền hệ thống.</p>
                 </div>
               </div>
-              <input type="text" id="user-search" class="admin-search-input"
-                placeholder="🔍 Tìm theo email hoặc tên..." />
             </div>
 
-            <!-- Dashboard Mini cho User Manager -->
-            <div id="user-manager-dashboard" class="glass-panel-v2" style="margin-bottom: 1.5rem; padding: 1.5rem; display: none;">
-              <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                <h3 style="margin:0; font-size: 1.1rem; color: var(--admin-primary);">📊 Tổng quan Người dùng</h3>
-                <span class="badge-ai" style="background:rgba(56, 189, 248, 0.1); color:#38bdf8; border:1px solid rgba(56,189,248,0.2); padding:4px 10px; border-radius:20px; font-size:0.65rem; font-weight:800;">LIVE UPDATE</span>
-              </div>
-              <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1.5rem;">
-                <div style="text-align:center; padding:1rem; background:rgba(0,0,0,0.2); border-radius:12px; border:1px solid rgba(255,255,255,0.05);">
-                  <div style="font-size:1.8rem; font-weight:800; color:#38bdf8" id="um-total-users">—</div>
-                  <div style="font-size:0.8rem; color:var(--admin-text-muted); margin-top:0.2rem;">Tổng Thành Viên</div>
-                </div>
-                <div style="text-align:center; padding:1rem; background:rgba(0,0,0,0.2); border-radius:12px; border:1px solid rgba(255,255,255,0.05);">
-                  <div style="font-size:1.8rem; font-weight:800; color:#10b981" id="um-new-today">—</div>
-                  <div style="font-size:0.8rem; color:var(--admin-text-muted); margin-top:0.2rem;">Đăng ký hôm nay</div>
-                </div>
-                <div style="text-align:center; padding:1rem; background:rgba(0,0,0,0.2); border-radius:12px; border:1px solid rgba(255,255,255,0.05);">
-                  <div style="font-size:1.8rem; font-weight:800; color:#f59e0b" id="um-businesses">—</div>
-                  <div style="font-size:0.8rem; color:var(--admin-text-muted); margin-top:0.2rem;">Doanh nghiệp</div>
-                </div>
-                <div style="text-align:center; padding:1rem; background:rgba(0,0,0,0.2); border-radius:12px; border:1px solid rgba(255,255,255,0.05);">
-                  <div style="font-size:1.8rem; font-weight:800; color:#ef4444" id="um-suspended">—</div>
-                  <div style="font-size:0.8rem; color:var(--admin-text-muted); margin-top:0.2rem;">Bị khóa</div>
+            <div id="sub-panel-users-list" class="sub-panel">
+              <div class="glass-panel" style="padding: 1.5rem; margin-bottom: 1.5rem;">
+                <div style="display:flex; justify-content: space-between; align-items: center; gap: 1rem;">
+                  <div class="bulk-actions" style="display:flex; gap:0.5rem;">
+                     <button class="btn btn--small btn--ghost" onclick="WanderUI.exportToCSV('users')">📥 Xuất CSV</button>
+                     <button class="btn btn--small btn--ghost" onclick="WanderToast.warn('Tính năng đang phát triển')">🔒 Khóa loạt</button>
+                  </div>
+                  <input type="text" id="user-search" class="admin-search-input" style="max-width: 300px;"
+                    placeholder="🔍 Tìm email hoặc tên..." />
                 </div>
               </div>
-              <div style="height: 220px; position: relative;">
-                <canvas id="userManagerChart"></canvas>
+
+              <!-- Filter Tabs -->
+              <div class="user-role-tabs" style="display:flex; gap:0.5rem; margin-bottom:1rem; flex-wrap:wrap; align-items:center;">
+                <button class="btn btn--small user-role-filter is-active" data-role="all">👥 Tất cả</button>
+                <button class="btn btn--small user-role-filter" data-role="user">🙋 Người dùng</button>
+                <button class="btn btn--small user-role-filter" data-role="admin">🛡️ Admin</button>
+                <button class="btn btn--small user-role-filter" data-role="business">🏢 Doanh nghiệp</button>
+                
+                <div style="height: 20px; width: 1px; background: rgba(255,255,255,0.1); margin: 0 0.5rem;"></div>
+                
+                <select id="user-status-filter" class="admin-search-input" style="max-width: 150px; height: 32px; padding: 0 0.5rem; font-size: 0.8rem;">
+                  <option value="all">Trạng thái: Tất cả</option>
+                  <option value="active">Đang hoạt động</option>
+                  <option value="suspended">Đã khóa</option>
+                  <option value="pending">Chờ duyệt</option>
+                </select>
+
+                <span id="user-count-label" style="margin-left:auto; font-size:0.82rem; color:var(--admin-text-muted); align-self:center;"></span>
               </div>
-            </div>
-            <!-- Filter Tabs -->
-            <div class="user-role-tabs" style="display:flex; gap:0.5rem; margin-bottom:1rem; flex-wrap:wrap;">
-              <button class="btn btn--small user-role-filter is-active" data-role="all">👥 Tất cả</button>
-              <button class="btn btn--small user-role-filter" data-role="user">🙋 Người dùng</button>
-              <button class="btn btn--small user-role-filter" data-role="admin">🛡️ Admin</button>
-              <button class="btn btn--small user-role-filter" data-role="superadmin">⭐ Super Admin</button>
-              <button class="btn btn--small user-role-filter" data-role="business">🏢 Doanh nghiệp</button>
-              <span id="user-count-label" style="margin-left:auto; font-size:0.82rem; color:var(--admin-text-muted); align-self:center;"></span>
-            </div>
-            <div class="table-wrap">
-              <table class="admin-table">
-                <thead>
-                  <tr>
-                    <th>Avatar</th>
-                    <th>Tên / Email</th>
-                    <th>XP / Hạng</th>
-                    <th>Vai trò</th>
-                    <th>Ngày tham gia</th>
-                    <th>Hành động</th>
-                  </tr>
-                </thead>
-                <tbody id="users-tbody">
-                  <tr>
-                    <td colspan="6" style="text-align:center;padding:2rem">Đang tải...</td>
-                  </tr>
-                </tbody>
-              </table>
+
+              <div class="table-wrap">
+                <table class="admin-table">
+                  <thead>
+                    <tr>
+                      <th>Avatar</th>
+                      <th>Tên / Email</th>
+                      <th>XP / Hạng</th>
+                      <th>Vai trò</th>
+                      <th>Ngày tham gia</th>
+                      <th>Hành động</th>
+                    </tr>
+                  </thead>
+                  <tbody id="users-tbody">
+                    <tr><td colspan="6" style="text-align:center;padding:2rem">Đang tải...</td></tr>
+                  </tbody>
+                </table>
+              </div>
             </div>
           </section>
           
-          <!-- Places Panel -->
           <section id="panel-places" class="admin-panel" hidden>
-            <div class="admin-panel-header">
-              <h2 class="section-title" style="font-size:1.4rem;margin:0">Điểm Du Lịch</h2>
-              <div style="display:flex;gap:0.75rem;align-items:center">
+            <div class="panel-header-top">
+              <div style="display:flex; justify-content: space-between; align-items: flex-end; margin-bottom: 1.5rem;">
+                <div>
+                  <h1 class="main-title">Kho điểm đến & Dịch vụ</h1>
+                  <p class="main-subtitle" style="margin-bottom:0">Quản lý các địa điểm du lịch, khách sạn và dịch vụ trên hệ thống.</p>
+                </div>
+              </div>
+              <div style="display:flex; gap:0.75rem; align-items:center">
                 <button class="btn btn--ghost btn--small" onclick="WanderUI.exportToCSV('places')">📥 Xuất CSV</button>
+                <select id="place-category-filter" class="admin-search-input" style="max-width: 150px; height: 36px; padding: 0 0.75rem; font-size: 0.85rem; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #fff;">
+                  <option value="all">Loại: Tất cả</option>
+                  <option value="cultural">Văn hóa</option>
+                  <option value="nature">Thiên nhiên</option>
+                  <option value="culinary">Ẩm thực</option>
+                  <option value="activity">Hoạt động</option>
+                  <option value="accommodation">Lưu trú</option>
+                </select>
                 <input type="text" id="place-search" class="admin-search-input" placeholder="🔍 Tìm điểm đến..." />
                 <button class="btn btn--primary btn--small" id="btn-add-place">+ Thêm mới</button>
               </div>
             </div>
 
-            <!-- Dashboard Mini cho Kho Địa Điểm -->
-            <div id="place-manager-dashboard" class="glass-panel-v2" style="margin-bottom: 1.5rem; padding: 1.5rem; display: none;">
-              <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                <h3 style="margin:0; font-size: 1.1rem; color: var(--admin-primary);">🗺️ Tổng quan Kho Địa Điểm</h3>
-                <span class="badge-ai" style="background:rgba(16, 185, 129, 0.1); color:#10b981; border:1px solid rgba(16,185,129,0.2); padding:4px 10px; border-radius:20px; font-size:0.65rem; font-weight:800;">DATA READY</span>
-              </div>
-              <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1.5rem;">
-                <div style="text-align:center; padding:1rem; background:rgba(0,0,0,0.2); border-radius:12px; border:1px solid rgba(255,255,255,0.05);">
-                  <div style="font-size:1.8rem; font-weight:800; color:#10b981" id="pm-total-places">—</div>
-                  <div style="font-size:0.8rem; color:var(--admin-text-muted); margin-top:0.2rem;">Tổng Địa Điểm</div>
-                </div>
-                <div style="text-align:center; padding:1rem; background:rgba(0,0,0,0.2); border-radius:12px; border:1px solid rgba(255,255,255,0.05);">
-                  <div style="font-size:1.8rem; font-weight:800; color:#f59e0b" id="pm-top-places">—</div>
-                  <div style="font-size:0.8rem; color:var(--admin-text-muted); margin-top:0.2rem;">Địa điểm HOT</div>
-                </div>
-                <div style="text-align:center; padding:1rem; background:rgba(0,0,0,0.2); border-radius:12px; border:1px solid rgba(255,255,255,0.05);">
-                  <div style="font-size:1.8rem; font-weight:800; color:#38bdf8" id="pm-verified">—</div>
-                  <div style="font-size:0.8rem; color:var(--admin-text-muted); margin-top:0.2rem;">Đã kiểm chứng</div>
-                </div>
-                <div style="text-align:center; padding:1rem; background:rgba(0,0,0,0.2); border-radius:12px; border:1px solid rgba(255,255,255,0.05);">
-                  <div style="font-size:1.8rem; font-weight:800; color:#6366f1" id="pm-regions">—</div>
-                  <div style="font-size:0.8rem; color:var(--admin-text-muted); margin-top:0.2rem;">Vùng miền</div>
-                </div>
-              </div>
-              <div style="height: 200px; position: relative;">
-                <canvas id="placeManagerChart"></canvas>
-              </div>
-            </div>
+            <!-- Dashboard Mini đã được chuyển sang phần Thống kê -->
             <div class="table-wrap">
               <table class="admin-table">
                 <thead>
@@ -889,7 +1153,7 @@
           </section>
 
           <!-- Admin Management Panel -->
-          <section id="panel-admin-management" class="admin-panel glass-panel" hidden>
+          <section id="panel-admins" class="admin-panel glass-panel" hidden>
             <div class="admin-panel-header">
               <h2 class="section-title">Quản lý & Phân quyền Admin</h2>
               <p class="section-desc">Tạo tài khoản quản trị viên cấp thấp và giới hạn quyền truy cập từng khu vực.</p>
@@ -949,6 +1213,26 @@
               </div>
             </form>
             <p id="w-admin-create-status" style="margin-top:1rem; min-height:1.2rem; text-align:center; font-weight:600;"></p>
+
+            <div style="margin-top:3rem;">
+              <h3 class="section-title" style="font-size:1.1rem; margin-bottom:1rem;">👥 Đội ngũ quản trị viên hiện tại</h3>
+              <div class="table-wrap">
+                <table class="admin-table">
+                  <thead>
+                    <tr>
+                      <th>Tên/Email</th>
+                      <th>Vai trò</th>
+                      <th>Quyền hạn</th>
+                      <th>Trạng thái</th>
+                      <th>Hành động</th>
+                    </tr>
+                  </thead>
+                  <tbody id="admins-list-tbody">
+                    <tr><td colspan="5" style="text-align:center;padding:2rem;color:var(--admin-text-muted)">Đang tải danh sách...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </section>
 
           <!-- Feedbacks Panel -->
@@ -1005,117 +1289,70 @@
             </div>
           </section>
 
-          <!-- Knowledge Panel -->
-          <section id="panel-knowledge" class="admin-panel glass-panel" hidden>
+          <!-- Vouchers Panel -->
+          <section id="panel-vouchers" class="admin-panel glass-panel" hidden>
             <div class="admin-panel-header">
               <div style="flex:1">
-                <h2 class="section-title">Quản lý Tri thức AI (Smart Cache)</h2>
-                <p class="section-desc">Cung cấp các câu trả lời mẫu để Chatbot phản hồi tức thì mà không cần gọi Groq AI.</p>
+                <h2 class="section-title">Quản lý Mã khuyến mãi (Vouchers)</h2>
+                <p class="section-desc">Tạo và phát hành mã giảm giá, quà tặng cho người dùng và đối tác doanh nghiệp.</p>
               </div>
               <div style="display:flex; gap:0.75rem;">
-                <button class="btn btn--success btn--small" id="btn-seed-knowledge">♻️ Nạp dữ liệu mẫu</button>
-                <button class="btn btn--primary btn--small" id="btn-add-knowledge">+ Thêm câu hỏi</button>
+                <button class="btn btn--success btn--small" id="btn-generate-vouchers">🎁 Phát hành hàng loạt</button>
+                <button class="btn btn--primary btn--small" id="btn-add-voucher">+ Thêm mã mới</button>
               </div>
             </div>
 
-            <!-- Dashboard Mini cho AI Knowledge -->
-            <div id="knowledge-manager-dashboard" class="glass-panel-v2" style="margin-bottom: 1.5rem; padding: 1.5rem; display: none;">
-              <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                <h3 style="margin:0; font-size: 1.1rem; color: var(--admin-primary);">🧠 Thống kê Dữ liệu AI</h3>
-              </div>
-              <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem;">
-                <div style="text-align:center; padding:1rem; background:rgba(0,0,0,0.2); border-radius:12px; border:1px solid rgba(255,255,255,0.05);">
-                  <div style="font-size:1.8rem; font-weight:800; color:#6366f1" id="km-total">—</div>
-                  <div style="font-size:0.8rem; color:var(--admin-text-muted); margin-top:0.2rem;">Tổng câu hỏi</div>
-                </div>
-                <div style="text-align:center; padding:1rem; background:rgba(0,0,0,0.2); border-radius:12px; border:1px solid rgba(255,255,255,0.05);">
-                  <div style="font-size:1.8rem; font-weight:800; color:#38bdf8" id="km-tags">—</div>
-                  <div style="font-size:0.8rem; color:var(--admin-text-muted); margin-top:0.2rem;">Từ khóa (Tags)</div>
-                </div>
-                <div style="text-align:center; padding:1rem; background:rgba(0,0,0,0.2); border-radius:12px; border:1px solid rgba(255,255,255,0.05);">
-                  <div style="font-size:1.8rem; font-weight:800; color:#10b981" id="km-recent">—</div>
-                  <div style="font-size:0.8rem; color:var(--admin-text-muted); margin-top:0.2rem;">Mới trong tuần</div>
-                </div>
-              </div>
-            </div>
             <div class="table-wrap">
               <table class="admin-table">
                 <thead>
                   <tr>
-                    <th>Câu hỏi / Từ khóa</th>
-                    <th>Câu trả lời</th>
-                    <th>Tags</th>
+                    <th>Mã / Tên chương trình</th>
+                    <th>Giá trị</th>
+                    <th>Hạn dùng / Số lượng</th>
                     <th>Hành động</th>
                   </tr>
                 </thead>
-                <tbody id="knowledge-tbody">
-                  <tr><td colspan="4" style="text-align:center">Đang tải dữ liệu tri thức...</td></tr>
+                <tbody id="vouchers-tbody">
+                  <tr><td colspan="4" style="text-align:center">Đang tải danh sách khuyến mãi...</td></tr>
                 </tbody>
               </table>
             </div>
           </section>
 
-          <!-- ── AI Intelligence Panel ── -->
-          <section id="panel-ai-intelligence" class="admin-panel glass-panel" hidden>
-            <!-- Header -->
-            <div class="admin-panel-header">
-              <div style="flex:1">
-                <h2 class="section-title">⚡ WanderIntel — Phân tích Thời gian thực</h2>
-                <p class="section-desc">Dữ liệu từ MongoDB · Tự động làm mới mỗi 30 giây · <span id="intel-updated-at" style="color:var(--admin-primary)">Đang tải...</span></p>
-              </div>
-              <div class="ai-status-indicator">
-                <span class="pulse-dot"></span> LIVE
-              </div>
-            </div>
-
-            <!-- Stats Row -->
-            <div style="display:grid; grid-template-columns: repeat(4,1fr); gap:1rem; margin-top:1.5rem;">
-              <div class="glass-panel-v2" style="text-align:center; padding:1.2rem;">
-                <div style="font-size:2rem; font-weight:800; color:var(--admin-primary)" id="intel-total-itin">—</div>
-                <div style="font-size:0.8rem; color:var(--admin-text-muted); margin-top:0.2rem;">Tổng lịch trình</div>
-              </div>
-              <div class="glass-panel-v2" style="text-align:center; padding:1.2rem;">
-                <div style="font-size:2rem; font-weight:800; color:#6366f1" id="intel-real-users">—</div>
-                <div style="font-size:0.8rem; color:var(--admin-text-muted); margin-top:0.2rem;">Người dùng thật</div>
-              </div>
-              <div class="glass-panel-v2" style="text-align:center; padding:1.2rem;">
-                <div style="font-size:2rem; font-weight:800; color:#10b981" id="intel-sentiment">—%</div>
-                <div style="font-size:0.8rem; color:var(--admin-text-muted); margin-top:0.2rem;">Mức độ hài lòng</div>
-              </div>
-              <div class="glass-panel-v2" style="text-align:center; padding:1.2rem;">
-                <div style="font-size:1.1rem; font-weight:800; color:#f59e0b" id="intel-top-dest">—</div>
-                <div style="font-size:0.8rem; color:var(--admin-text-muted); margin-top:0.2rem;">Điểm đến #1 tuần này</div>
-              </div>
-            </div>
-
-            <!-- Main Chart -->
-            <div class="glass-panel-v2" style="margin-top:1.2rem; padding:1.5rem;">
-              <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:1rem;">
-                <h3 style="margin:0; font-size:1rem; color:var(--admin-text);">📈 Xu hướng lịch trình 7 ngày gần nhất</h3>
-                <div style="display:flex; gap:0.5rem;">
-                  <button class="btn btn--small btn--ghost is-active" id="intel-chart-mode-daily" onclick="switchIntelChart('daily')">Theo ngày</button>
-                  <button class="btn btn--small btn--ghost" id="intel-chart-mode-dest" onclick="switchIntelChart('dest')">Theo điểm đến</button>
+          <!-- Campaigns Panel -->
+          <section id="panel-campaigns" class="admin-panel" hidden>
+            <div class="panel-header-top">
+              <div style="display:flex; justify-content: space-between; align-items: flex-end; margin-bottom: 1.5rem;">
+                <div>
+                  <h1 class="main-title">Quản lý Chiến dịch</h1>
+                  <p class="main-subtitle" style="margin-bottom:0">Theo dõi hiệu quả các chương trình marketing và tăng trưởng.</p>
                 </div>
-              </div>
-              <div style="height:280px; position:relative;">
-                <canvas id="aiTrendChart"></canvas>
+                <button class="btn btn--primary" id="btn-new-campaign">+ Tạo chiến dịch mới</button>
               </div>
             </div>
 
-            <!-- Bottom: Top Destinations + Activity Log -->
-            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:1.2rem; margin-top:1.2rem;">
-              <!-- Top Destinations -->
-              <div class="glass-panel-v2">
-                <h3 style="margin:0 0 1rem; font-size:0.95rem; color:var(--admin-text);">🗺️ Top điểm đến tuần này</h3>
-                <div id="intel-top-list" style="display:flex; flex-direction:column; gap:0.6rem;">
-                  <div style="color:var(--admin-text-muted); font-size:0.85rem;">Đang tải...</div>
+            <div class="sub-panel">
+               <div style="display:grid; grid-template-columns: 1fr 1fr; gap:1.5rem;">
+                <!-- Active Campaigns -->
+                <div class="glass-panel" style="padding: 1.5rem;">
+                  <h3 style="margin:0 0 1.5rem; font-size:1.1rem; color:var(--admin-text);">🚀 Chiến dịch đang chạy</h3>
+                  <div id="campaign-active-list" style="display:flex; flex-direction:column; gap:0.8rem;">
+                    <div style="color:var(--admin-text-muted); font-size:0.85rem;">Không có chiến dịch nào đang hoạt động.</div>
+                  </div>
                 </div>
-              </div>
-              <!-- Recent Activity -->
-              <div class="glass-panel-v2">
-                <h3 style="margin:0 0 1rem; font-size:0.95rem; color:var(--admin-text);">🕐 Hoạt động gần đây</h3>
-                <div id="intel-recent-logs" style="display:flex; flex-direction:column; gap:0.6rem;">
-                  <div style="color:var(--admin-text-muted); font-size:0.85rem;">Đang tải...</div>
+                <!-- Growth Insights -->
+                <div class="glass-panel" style="padding: 1.5rem;">
+                  <h3 style="margin:0 0 1.5rem; font-size:1.1rem; color:var(--admin-text);">📈 Chỉ số tăng trưởng</h3>
+                  <div id="growth-insights-list" style="display:flex; flex-direction:column; gap:0.8rem;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; padding:0.75rem; background:rgba(255,255,255,0.03); border-radius:8px;">
+                      <span style="font-size:0.9rem;">Người dùng mới (24h)</span>
+                      <span style="font-weight:700; color:var(--admin-success);">+12</span>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; align-items:center; padding:0.75rem; background:rgba(255,255,255,0.03); border-radius:8px;">
+                      <span style="font-size:0.9rem;">Tỷ lệ chuyển đổi</span>
+                      <span style="font-weight:700; color:var(--admin-primary);">4.5%</span>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1123,43 +1360,21 @@
 
           <!-- Lịch sử hoạt động Panel -->
           <section id="panel-logs" class="admin-panel glass-panel" hidden>
-            <div class="admin-panel-header">
-              <h2 class="section-title" style="font-size:1.4rem;margin:0">Lịch sử hệ thống</h2>
-              <div class="filter-bar">
-                <button class="btn btn--small btn--ghost" data-log-filter="all">Tất cả</button>
-                <button class="btn btn--small btn--ghost" data-log-filter="user">Người dùng</button>
-                <button class="btn btn--small btn--ghost" data-log-filter="business">Doanh nghiệp</button>
-                <button class="btn btn--small btn--ghost" data-log-filter="admin">Admin</button>
+            <div style="display:flex; justify-content: space-between; align-items: flex-end; margin-bottom: 1rem;">
+              <div>
+                <h2 class="section-title" style="font-size:1.4rem;margin:0">Lịch sử hệ thống</h2>
+                <p class="section-desc" style="margin:0.25rem 0 0">Toàn bộ hoạt động của người dùng, admin và hệ thống.</p>
               </div>
+            </div>
+            <div class="filter-bar" style="margin-bottom: 1rem;">
+              <button class="btn btn--small btn--ghost" data-log-filter="all">Tất cả</button>
+              <button class="btn btn--small btn--ghost" data-log-filter="user">Người dùng</button>
+              <button class="btn btn--small btn--ghost" data-log-filter="business">Doanh nghiệp</button>
+              <button class="btn btn--small btn--ghost" data-log-filter="admin">Admin</button>
             </div>
 
-            <!-- Dashboard Mini cho Nhật Ký -->
-            <div id="log-manager-dashboard" class="glass-panel-v2" style="margin-bottom: 1.5rem; padding: 1.5rem; display: none;">
-              <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                <h3 style="margin:0; font-size: 1.1rem; color: var(--admin-primary);">📜 Phân tích Nhật Ký Hệ Thống</h3>
-              </div>
-              <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1.5rem;">
-                <div style="text-align:center; padding:1rem; background:rgba(0,0,0,0.2); border-radius:12px; border:1px solid rgba(255,255,255,0.05);">
-                  <div style="font-size:1.8rem; font-weight:800; color:#38bdf8" id="lm-total">—</div>
-                  <div style="font-size:0.8rem; color:var(--admin-text-muted); margin-top:0.2rem;">Tổng Log</div>
-                </div>
-                <div style="text-align:center; padding:1rem; background:rgba(0,0,0,0.2); border-radius:12px; border:1px solid rgba(255,255,255,0.05);">
-                  <div style="font-size:1.8rem; font-weight:800; color:#6366f1" id="lm-today">—</div>
-                  <div style="font-size:0.8rem; color:var(--admin-text-muted); margin-top:0.2rem;">Hôm nay</div>
-                </div>
-                <div style="text-align:center; padding:1rem; background:rgba(0,0,0,0.2); border-radius:12px; border:1px solid rgba(255,255,255,0.05);">
-                  <div style="font-size:1.8rem; font-weight:800; color:#f59e0b" id="lm-admin">—</div>
-                  <div style="font-size:0.8rem; color:var(--admin-text-muted); margin-top:0.2rem;">Hành động Admin</div>
-                </div>
-                <div style="text-align:center; padding:1rem; background:rgba(0,0,0,0.2); border-radius:12px; border:1px solid rgba(255,255,255,0.05);">
-                  <div style="font-size:1.8rem; font-weight:800; color:#10b981" id="lm-system">—</div>
-                  <div style="font-size:0.8rem; color:var(--admin-text-muted); margin-top:0.2rem;">Hệ thống</div>
-                </div>
-              </div>
-              <div style="height: 180px; position: relative;">
-                <canvas id="logManagerChart"></canvas>
-              </div>
-            </div>
+
+            <!-- Dashboard Mini đã được chuyển sang phần Thống kê -->
             <div class="table-wrap">
               <table class="admin-table">
                 <thead>
