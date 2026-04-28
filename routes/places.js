@@ -1,4 +1,5 @@
 const express = require('express');
+const mongoose = require('mongoose');
 const router = express.Router();
 const Place = require('../models/Place');
 const User = require('../models/User');
@@ -20,12 +21,68 @@ try {
   console.error("Error loading places fallback data:", e);
 }
 
+// Lấy lịch sử đánh giá của tôi
+router.get('/my-reviews', auth, async (req, res) => {
+  try {
+    const places = await Place.find({ 'reviews.userId': req.user.id }).lean();
+    const myReviews = [];
+    places.forEach(p => {
+      if (p.reviews && Array.isArray(p.reviews)) {
+        p.reviews.forEach(r => {
+          if (r.userId === req.user.id) {
+            myReviews.push({
+              placeId: p.id,
+              placeName: p.name,
+              placeImage: (p.images && p.images[0]) || p.image || '',
+              ...r
+            });
+          }
+        });
+      }
+    });
+    res.json({ success: true, data: myReviews.sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt)) });
+  } catch(err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Lấy chi tiết một địa điểm
+router.get('/:id', async (req, res) => {
+  try {
+    const id = req.params.id;
+    let place;
+    if (mongoose.Types.ObjectId.isValid(id)) {
+      place = await Place.findById(id).lean();
+    } else {
+      place = await Place.findOne({ id: id }).lean();
+    }
+
+    // Fallback to static data if not found in DB
+    if (!place && placesData && placesData.length > 0) {
+      place = placesData.find(p => p.id === id || p._id === id);
+    }
+
+    if (!place) return res.status(404).json({ success: false, message: 'Không tìm thấy địa điểm' });
+
+    if (place.ownerId) {
+      const biz = await BusinessAccount.findById(place.ownerId).select('displayName name').lean().catch(() => null);
+      if (biz) place.ownerName = biz.displayName || biz.name;
+    }
+
+    res.json({ success: true, data: place });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // Lấy danh sách Address
 router.get('/', async (req, res) => {
   try {
     // Chỉ lấy các địa điểm đã được phê duyệt
     const [places, businesses] = await Promise.all([
-      Place.find({ status: 'approved' }).lean(),
+      Place.find({ status: 'approved' })
+           .select('id name region meta text budget pace image images verified top favoritesCount ownerId lat lng transportTips')
+           .lean(),
       BusinessAccount.find().select('name displayName').lean()
     ]);
 
@@ -42,7 +99,8 @@ router.get('/', async (req, res) => {
     // Nếu db trống, tự động chèn dữ liệu mẫu vào MongoDB (Seeding)
     if (placesData && placesData.length > 0) {
       console.log('Database trống. Đang tự động nạp dữ liệu mẫu vào MongoDB...');
-      await Place.insertMany(placesData);
+      const seedData = placesData.map(p => ({ ...p, status: 'approved' }));
+      await Place.insertMany(seedData);
       console.log('Nạp dữ liệu mẫu thành công!');
       const newPlaces = await Place.find({}).lean();
       return res.json({ success: true, data: newPlaces });
@@ -58,9 +116,14 @@ router.get('/', async (req, res) => {
 router.post('/seed', adminTokenAuth, async (req, res) => {
   try {
     if (req.user.role !== 'superadmin') return res.status(403).json({ success: false, message: 'Chỉ Super Admin mới được seed data' });
-    await Place.deleteMany({}); // Xóa dữ liệu cũ
-    const inserted = await Place.insertMany(placesData);
-    res.json({ success: true, message: `Đã tự động tạo database và chèn ${inserted.length} bản ghi!` });
+    const enriched = placesData.map(p => ({
+      ...p,
+      favoritesCount: 0,
+      ratingAvg: '0',
+      reviewCount: 0
+    }));
+    const inserted = await Place.insertMany(enriched);
+    res.json({ success: true, message: `Đã nạp ${inserted.length} địa điểm với dữ liệu tương tác thực tế!` });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }

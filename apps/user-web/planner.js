@@ -25,28 +25,68 @@ document.addEventListener('DOMContentLoaded', function () {
   var currentPlanIndex = -1;
   var currentItineraryId = null;
 
-  // ---- Chế độ Xem Lịch Trình (từ My Trips) ----
+  // ---- Chế độ Xem Lịch Trình (từ My Trips hoặc Lịch sử) ----
   var urlParams = new URLSearchParams(window.location.search);
   var viewModeHeader = document.getElementById('viewModeHeader');
-  if (urlParams.get('view') === 'true') {
+  var itinId = urlParams.get('itin');
+  if (itinId) {
+    itinId = itinId.trim();
+    placeholder.style.display = 'none';
+    loader.style.display = 'flex';
+    var token = localStorage.getItem('wander_token');
+    fetch('/api/planner/itinerary/' + itinId, {
+      headers: { 'x-auth-token': token || '' }
+    })
+      .then(function(r) { return r.json(); })
+      .then(function(json) {
+        loader.style.display = 'none';
+        if (json.success && json.data) {
+          var itin = json.data;
+          var plan = itin.planJson;
+          currentItineraryId = itin._id;
+          planHistory.push(plan);
+          currentPlanIndex = 0;
+          
+          viewModeHeader.style.display = 'flex';
+          var formCard = form.closest('.planner-form-card');
+          if (formCard) formCard.style.display = 'none';
+          
+          renderVersionTabs();
+          renderItinerary(plan, itin.destination || plan.destination || '', itin.days || plan.days || 1, itin.tripDate);
+          resultContainer.style.display = 'block';
+          refineBox.style.display = 'block';
+          btnSaveTrip.style.display = 'none';
+        } else {
+          loader.style.display = 'none';
+          placeholder.style.display = 'flex';
+          if (window.WanderUI && WanderUI.showToast) {
+            WanderUI.showToast(json.message || 'Không tìm thấy lịch trình này.', 'error');
+          } else {
+            console.warn('Itin not found:', json.message);
+          }
+        }
+      })
+      .catch(function(err) {
+        loader.style.display = 'none';
+        placeholder.style.display = 'flex';
+        console.error("Fetch itin error", err);
+      });
+  } else if (urlParams.get('view') === 'true') {
     var stored = sessionStorage.getItem('wander_view_trip');
     if (stored) {
       try {
         var plan = JSON.parse(stored);
-        // sessionStorage.removeItem('wander_view_trip'); // Keep it during the session in case of refresh
         planHistory.push(plan);
         currentPlanIndex = 0;
-
-        // Hiện header chế độ xem và ẩn form tạo mới
         viewModeHeader.style.display = 'flex';
-        form.closest('.planner-form-card').style.display = 'none';
+        var formCard = form.closest('.planner-form-card');
+        if (formCard) formCard.style.display = 'none';
         renderVersionTabs();
         renderItinerary(plan, plan.destination || '', '');
         resultContainer.style.display = 'block';
         refineBox.style.display = 'block';
         placeholder.style.display = 'none';
         resetSaveButton();
-        // Ẩn nút Lưu vì user đã lưu rồi mới xem 
         btnSaveTrip.style.display = 'none';
       } catch (e) {
         console.error('Lỗi parse session trip:', e);

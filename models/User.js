@@ -25,6 +25,11 @@ const userSchema = new mongoose.Schema({
     habits: [String],
     theme: { type: String, default: 'light' }
   },
+  // AI Self-Learning Memory: Stores insights extracted from chats/actions
+  preferenceProfile: {
+    aiInsights: [{ type: String }],
+    lastAnalyzed: { type: Date }
+  },
   savedTrips: [{
     name: String,
     stops: [{
@@ -44,7 +49,11 @@ const userSchema = new mongoose.Schema({
   rank: { type: String, default: 'Đồng' },
   rankTier: { type: String, default: 'I' },
   claimedQuests: [String],
+  favorites: [{ type: String }], // Array of place IDs
   createdAt: { type: Date, default: Date.now }
 });
+
+userSchema.index({ points: -1 });
+userSchema.index({ role: 1, points: -1 });
 
 module.exports = mongoose.model('User', userSchema);

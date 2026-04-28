@@ -7,7 +7,10 @@ const ConversationSchema = new mongoose.Schema({
   title: { type: String }, // Tiêu đề phiên chat (không để mặc định để dễ backfill)
   role: { type: String, enum: ['user', 'model'], required: true },
   text: { type: String, required: true, index: true },
-  timestamp: { type: Date, default: Date.now }
+  timestamp: { type: Date, default: Date.now },
+  // Trí tuệ tự học (RLHF)
+  feedback: { type: String, enum: ['up', 'down', 'none'], default: 'none' },
+  feedbackReason: { type: String }
 });
 
 // Lưu trữ tối đa 100 tin nhắn gần nhất mỗi người dùng để tối ưu DB (Optional logic)

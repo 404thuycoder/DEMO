@@ -1,4 +1,5 @@
 const express = require('express');
+const mongoose = require('mongoose');
 const router = express.Router();
 const { auth, JWT_SECRET } = require('./auth');
 const Groq = require('groq-sdk');
@@ -428,6 +429,30 @@ router.get('/my-trips', auth, async (req, res) => {
   } catch (error) {
     console.error('Planner DB Error:', error);
     res.status(500).json({ success: false, message: 'Lỗi server khi lấy danh sách.' });
+  }
+});
+
+// Lấy chi tiết một lịch trình cụ thể
+router.get('/itinerary/:id', optionalAuth, async (req, res) => {
+  try {
+    const id = req.params.id.trim();
+    console.log('Fetching itinerary detail for ID:', id);
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: 'ID không hợp lệ.' });
+    }
+    
+    // Tìm bằng query thô để bỏ qua casting phức tạp của Mongoose trên connection khác
+    const itin = await Itinerary.findOne({ _id: new mongoose.Types.ObjectId(id) }).lean();
+
+    if (!itin) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy lịch trình trong cơ sở dữ liệu.' });
+    }
+
+    // Kiểm tra quyền truy cập (nếu muốn bảo mật) - hiện tại cho phép xem công khai nếu có link
+    res.json({ success: true, data: itin });
+  } catch (error) {
+    console.error('Fetch Itinerary Error:', error);
+    res.status(500).json({ success: false, message: 'Lỗi server: ' + error.message });
   }
 });
 

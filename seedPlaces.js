@@ -17,7 +17,7 @@ const placesData = [
     interests: ["biển", "resort", "hải sản", "chụp ảnh"],
     meta: "Biển xanh, hoàng hôn & hải sản tươi",
     text: "Đảo ngọc Phú Quốc với dải cát trắng mịn, resort cao cấp trải dài, hệ sinh thái biển đa dạng, cùng các khu chợ đêm sầm uất và làng chài truyền thống ven biển. Là điểm đến hàng đầu cho kỳ nghỉ gia đình và tuần trăng mật.",
-    image: "https://images.unsplash.com/photo-1552465011-b4e21bf6e79a?w=800&q=80",
+    image: "assets/img/phu-quoc.png",
     lat: 10.2899, lng: 103.984, top: true,
     transportTips: "Nên đặt vé bay thẳng đến Phú Quốc (sân bay Phú Quốc). Trong đảo, thuê xe máy hoặc taxi điện VinBus để dạo quanh.",
     activities: [
@@ -119,7 +119,7 @@ const placesData = [
     interests: ["phố cổ", "ẩm thực", "làng nghề", "UNESCO"],
     meta: "Phố cổ đèn lồng & Di sản văn hóa UNESCO",
     text: "Hội An là di sản văn hóa thế giới được UNESCO công nhận, đặc trưng bởi những nếp nhà cổ kính sơn vàng và con sông Hoài lấp lánh hoa đăng về đêm. Nổi tiếng với ẩm thực tinh tế và các làng nghề truyền thống phong phú.",
-    image: "https://images.unsplash.com/photo-1598970434795-0c54fe7c0648?w=800&q=80",
+    image: "assets/img/hoi-an.png",
     lat: 15.8801, lng: 108.338, top: true,
     transportTips: "Bay đến sân bay Quốc tế Đà Nẵng, di chuyển bằng taxi hoặc xe bus khoảng 45 phút. Trong phố cổ, đi bộ hoặc xe đạp.",
     activities: [
@@ -212,7 +212,7 @@ const placesData = [
     interests: ["trekking", "bản làng", "ruộng bậc thang", "check-in"],
     meta: "Thiên đường mây & Ruộng bậc thang kỳ vĩ",
     text: "Thị trấn sương mù Sa Pa làm say lòng người với những đỉnh núi hùng vĩ, ruộng bậc thang uốn lượn và bản sắc văn hóa dân tộc rực rỡ sắc màu Tây Bắc. Fansipan — nóc nhà Đông Dương — là thử thách chinh phục của mọi phượt thủ.",
-    image: "https://images.unsplash.com/photo-1528181304800-259b08848526?w=800&q=80",
+    image: "assets/img/sa-pa.png",
     lat: 22.3364, lng: 103.8438, top: true,
     transportTips: "Đi xe giường nằm hoặc tàu hỏa đêm cabin giường nằm từ Hà Nội (6-8 tiếng). Sa Pa lạnh quanh năm — luôn mang áo ấm.",
     activities: [
@@ -305,7 +305,7 @@ const placesData = [
     interests: ["du thuyền", "kayak", "UNESCO", "check-in"],
     meta: "Kỳ quan thiên nhiên thế giới được UNESCO công nhận",
     text: "Quần thể hàng nghìn đảo đá vôi khổng lồ mọc lên giữa làn nước trong xanh như ngọc bích. Vịnh Hạ Long là di sản thiên nhiên thế giới hai lần được UNESCO công nhận và là biểu tượng du lịch của Việt Nam.",
-    image: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&q=80",
+    image: "assets/img/ha-long.png",
     lat: 20.9101, lng: 107.1839, top: true,
     transportTips: "Đi cao tốc Hà Nội - Hải Phòng - Quảng Ninh rút ngắn thời gian di chuyển còn khoảng 2-2.5 giờ. Nên đặt tour du thuyền từ 1-3 đêm.",
     activities: [
@@ -389,7 +389,7 @@ const placesData = [
     interests: ["phố cổ", "cà phê", "bảo tàng", "ẩm thực đường phố"],
     meta: "Thủ đô nghìn năm văn hiến & Ẩm thực đường phố",
     text: "Hà Nội pha trộn giữa lịch sử hàng ngàn năm tại 36 phố phường và cuộc sống hiện đại tất bật, nổi danh toàn cầu bởi ẩm thực đường phố phong phú từ phở, bún chả đến cà phê trứng độc đáo.",
-    image: "https://images.unsplash.com/photo-1502602898657-3e9172f29b78?w=800&q=80",
+    image: "assets/img/ha-noi.png",
     lat: 21.0285, lng: 105.8542, top: false,
     transportTips: "Đường Hà Nội khá hẹp ở khu Phố cổ. Nên đi bộ hoặc sử dụng ứng dụng ride-hailing như Grab, Be để di chuyển thuận tiện.",
     activities: [
@@ -776,7 +776,7 @@ const placesData = [
     interests: ["cố đô", "lăng tẩm", "ẩm thực cung đình", "UNESCO"],
     meta: "Cố đô lăng tẩm & Ẩm thực Cung đình độc đáo",
     text: "Cố đô Huế gắn liền với triều đại nhà Nguyễn, ẩn chứa hệ thống lăng tẩm nguy nga, cung đình hoành tráng và nền ẩm thực cung đình tinh tế được UNESCO vinh danh.",
-    image: "https://images.unsplash.com/photo-1548013146-72479768bada?w=800&q=80",
+    image: "assets/img/hue.png",
     lat: 16.4637, lng: 107.5909, top: false,
     transportTips: "Bay đến sân bay Phú Bài hoặc đi tàu hỏa. Thuê xe máy để thoải mái tham quan các lăng tẩm ở ngoại ô.",
     activities: [
@@ -1226,7 +1226,8 @@ async function seed() {
     await Place.deleteMany({});
     console.log('🗑️  Đã xóa dữ liệu cũ');
 
-    const result = await Place.insertMany(placesData);
+    const seedData = placesData.map(p => ({ ...p, status: 'approved' }));
+    const result = await Place.insertMany(seedData);
     console.log(`✅ Đã nạp thành công ${result.length} điểm du lịch vào MongoDB!`);
     
     result.forEach(p => {

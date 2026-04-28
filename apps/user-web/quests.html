@@ -542,14 +542,42 @@
           </div>
         </div>
 
-        <div id="questGrid" class="quest-grid">
-          <!-- Quests injected by JS -->
+      <!-- Danh sách nhiệm vụ -->
+      <div id="questGrid" class="quest-grid">
+        <div class="loading-wrap" id="questsLoading">
+          <div class="loading-spinner"></div>
+          <p>Đang chuẩn bị hành trình nhiệm vụ...</p>
         </div>
       </div>
     </div>
+  </div>
+
+  <style>
+    .loading-wrap {
+      grid-column: 1 / -1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 4rem 0;
+      color: var(--text-muted);
+    }
+    .loading-spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid var(--bg-soft);
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-bottom: 1rem;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
   </main>
 
-  <script src="SharedUI.js"></script>
+  <script src="SharedUI.js?v=1777335000000"></script>
   <script>
   (function() {
     var token = localStorage.getItem('wander_token');
@@ -723,40 +751,49 @@
       }
       document.getElementById('questsContainer').style.display = 'block';
 
-      fetch('/api/auth/user/rank', { headers: { 'x-auth-token': token } })
-        .then(function(r) { return r.json(); })
-        .then(function(json) {
-          if (!json.success) return;
-          globalRankData = json;
+      // Load all required data in parallel for maximum speed
+      Promise.all([
+        fetch('/api/auth/user/rank', { headers: { 'x-auth-token': token } }).then(r => r.json()),
+        fetch('/api/auth/user/activity', { headers: { 'x-auth-token': token } }).then(r => r.json()),
+        fetch('/api/planner/my-trips', { headers: { 'x-auth-token': token } }).then(r => r.json())
+      ])
+      .then(function(results) {
+        var rankRes = results[0];
+        var actRes = results[1];
+        var tripsRes = results[2];
+
+        if (rankRes && rankRes.success) {
+          globalRankData = rankRes;
           var mini = document.getElementById('heroRankMini');
           mini.style.display = 'inline-flex';
           
-          document.getElementById('heroRankName').innerHTML = WanderUI.getRankBadgeHTML(json.rank, json.rankTier);
-          document.getElementById('heroXpText').textContent = json.points + ' XP';
+          document.getElementById('heroRankName').innerHTML = WanderUI.getRankBadgeHTML(rankRes.rank, rankRes.rankTier);
+          document.getElementById('heroXpText').textContent = rankRes.points + ' XP';
           
           var thresholds = [0,100,200,300,500,700,1000,1300,1600,2000,2400,2800,3200,3700,4200,5000];
           var prev = 0;
           for (var i = 0; i < thresholds.length; i++) {
-            if (json.nextThreshold === thresholds[i]) { prev = thresholds[i-1] || 0; break; }
+            if (rankRes.nextThreshold === thresholds[i]) { prev = thresholds[i-1] || 0; break; }
           }
-          var pct = json.nextThreshold ? ((json.points - prev) / (json.nextThreshold - prev) * 100) : 100;
+          var pct = rankRes.nextThreshold ? ((rankRes.points - prev) / (rankRes.nextThreshold - prev) * 100) : 100;
           document.getElementById('heroXpBar').style.width = Math.min(100, Math.max(0, pct)) + '%';
+        }
 
-          return fetch('/api/auth/user/activity', { headers: { 'x-auth-token': token } });
-        })
-        .then(function(r) { return r ? r.json() : null; })
-        .then(function(act) {
-          if (!act) return;
-          var actLog = (act.success ? act.activityLog : []) || [];
-          fetch('/api/planner/my-trips', { headers: { 'x-auth-token': token } })
-            .then(function(r) { return r.json(); })
-            .then(function(trips) {
-              var allTrips = (trips.success ? trips.data : []) || [];
-              var stats = getCalculatedStats(actLog, allTrips, globalRankData);
-              var currentTab = document.querySelector('.vibrant-tab.is-active').getAttribute('data-tab');
-              renderQuests(currentTab, stats, globalRankData.claimedQuests);
-            });
-        }).catch(function() { renderQuests('all', {}, []); });
+        var actLog = (actRes && actRes.success ? actRes.activityLog : []) || [];
+        var allTrips = (tripsRes && tripsRes.success ? tripsRes.data : []) || [];
+        
+        if (globalRankData) {
+          var stats = getCalculatedStats(actLog, allTrips, globalRankData);
+          var currentTab = document.querySelector('.vibrant-tab.is-active').getAttribute('data-tab');
+          renderQuests(currentTab, stats, globalRankData.claimedQuests);
+        } else {
+          renderQuests('all', {}, []);
+        }
+      })
+      .catch(function(err) { 
+        console.error("Quests loading error:", err);
+        renderQuests('all', {}, []); 
+      });
     }
 
     document.querySelectorAll('.vibrant-tab').forEach(function(tab) {
@@ -830,6 +867,7 @@
     loadPage();
   })();
   </script>
-  <script src="main.js" defer></script>
+  <script src="chat-brain.js"></script>
+  <script src="main.js?v=1777307000000" defer></script>
 </body>
 </html>

@@ -305,7 +305,7 @@
       display: block;
       font-weight: 700;
       font-size: 1rem;
-      margin-bottom: 0.1rem;
+      margin-bottom: 0.4rem;
       color: var(--text);
     }
 
@@ -997,9 +997,9 @@
     </div>
   </main>
 
-  <!-- SVG filter for background removal is now injected via SharedUI.js for consistency across all pages -->
+  <!-- SVG filter for background removal is now injected via SharedUI.js?v=1777307000000 for consistency across all pages -->
 
-  <script src="SharedUI.js"></script>
+  <script src="SharedUI.js?v=1777335000000"></script>
   <script>
     document.addEventListener('DOMContentLoaded', function () {
       const list = document.getElementById('leaderboardList');
@@ -1220,7 +1220,8 @@
       localStorage.setItem('wv_quest_activity', JSON.stringify(qa));
     } catch (e) { }
   </script>
-  <script src="main.js" defer></script>
+  <script src="chat-brain.js"></script>
+  <script src="main.js?v=1777307000000" defer></script>
 </body>
 
 </html>

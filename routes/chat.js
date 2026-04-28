@@ -27,6 +27,16 @@ const optionalAuth = (req, res, next) => {
   next();
 };
 
+// Nạp danh sách điểm đến để hỗ trợ xác định vị trí (Cache để tăng tốc)
+let cachedPlaces = [];
+try {
+  const content = fs.readFileSync(path.join(__dirname, '../apps/user-web/places-data.js'), 'utf-8');
+  const extractJson = content.substring(content.indexOf('['), content.lastIndexOf(']') + 1);
+  cachedPlaces = eval(extractJson);
+} catch (e) {
+  console.error("Lỗi đọc places-data trong chat:", e);
+}
+
 router.post('/', optionalAuth, async (req, res) => {
   try {
     const { message, coords, itinerary, activeTrip, deviceId, role, sessionId } = req.body;
@@ -89,16 +99,11 @@ router.post('/', optionalAuth, async (req, res) => {
 
     let locationContext = "Chưa xác định rõ vị trí GPS.";
     if (coords && coords.lat && coords.lng) {
-      try {
-        const content = fs.readFileSync(path.join(__dirname, '../apps/user-web/places-data.js'), 'utf-8');
-        const extractJson = content.substring(content.indexOf('['), content.lastIndexOf(']') + 1);
-        const placesData = eval(extractJson);
-        const nearest = placesData.find(p => {
-          const d = Math.sqrt(Math.pow(p.lat - coords.lat, 2) + Math.pow(p.lng - coords.lng, 2));
-          return d < 0.5;
-        });
-        if (nearest) locationContext = `Vị trí hiện tại: ${nearest.name} (${nearest.region}). Đặc tả: ${nearest.text}.`;
-      } catch (e) { }
+      const nearest = cachedPlaces.find(p => {
+        const d = Math.sqrt(Math.pow(p.lat - coords.lat, 2) + Math.pow(p.lng - coords.lng, 2));
+        return d < 0.5;
+      });
+      if (nearest) locationContext = `Vị trí hiện tại: ${nearest.name} (${nearest.region}). Đặc tả: ${nearest.text}.`;
     }
 
     // --- START SMART CACHE (TRÍ NHỚ PHẢN XẠ) ---
@@ -216,12 +221,25 @@ PHONG CÁCH: Vui vẻ, hào hứng, xưng "mình" gọi "bạn". Giới hạn tr
 - DO NOT start your response with Vietnamese words like 'Chào bạn' or 'Xin chào'.`;
     }
 
+    // --- AI SELF-LEARNING MEMORY ---
+    let userMemoryContext = "";
+    if (req.user && req.user.id) {
+      try {
+        const fullUser = await User.findById(req.user.id).select('preferenceProfile');
+        if (fullUser && fullUser.preferenceProfile && fullUser.preferenceProfile.aiInsights && fullUser.preferenceProfile.aiInsights.length > 0) {
+          userMemoryContext = "AI MEMORY (Past Insights about this user): " + fullUser.preferenceProfile.aiInsights.join("; ");
+        }
+      } catch (err) {
+        console.error("Lỗi lấy User Memory:", err.message);
+      }
+    }
+
     systemPrompt += `
 ${langRule}
 
 CHARACTER: WanderViệt Assistant (Friendly, helpful).
 CONTEXT: ${locationContext} | ${tripContext}
-USER ROLE: ${userRole}
+${userMemoryContext ? userMemoryContext + '\n' : ''}USER ROLE: ${userRole}
 LIMIT: Under 60 words.
 `;
 
@@ -281,12 +299,14 @@ LIMIT: Under 60 words.
             text: message
           }).save();
 
-          await new Conversation({
+          const answerDoc = await new Conversation({
             userId: sessionKey,
             sessionId: currentSessionId,
             role: 'model',
             text: aiAnswer
           }).save();
+          
+          res.locals.messageId = answerDoc._id; // Store to return later
         } catch (saveErr) {
           console.error("Lỗi lưu trí nhớ:", saveErr.message);
         }
@@ -298,6 +318,7 @@ LIMIT: Under 60 words.
         success: true,
         answer: aiAnswer,
         sessionId: currentSessionId,
+        messageId: res.locals.messageId || null,
         source: 'groq-llama3-expert-v6'
       });
 
@@ -392,6 +413,33 @@ router.delete('/session/:sid', optionalAuth, async (req, res) => {
     }
   } catch (error) {
     res.status(500).json({ success: false, message: 'Lỗi khi xóa hội thoại.' });
+  }
+});
+
+// Nhận phản hồi RLHF từ người dùng
+router.post('/feedback', optionalAuth, async (req, res) => {
+  try {
+    const { messageId, feedback, reason } = req.body;
+    if (!messageId || !['up', 'down', 'none'].includes(feedback)) {
+      return res.status(400).json({ success: false, message: 'Dữ liệu không hợp lệ.' });
+    }
+
+    const sessionKey = req.user ? req.user.id : (req.query.deviceId || 'anonymous_guest');
+    
+    // Cập nhật phản hồi vào Conversation
+    const updated = await Conversation.findOneAndUpdate(
+      { _id: messageId, userId: sessionKey },
+      { $set: { feedback, feedbackReason: reason || '' } },
+      { new: true }
+    );
+
+    if (updated) {
+      res.json({ success: true, message: 'Cảm ơn phản hồi của bạn!' });
+    } else {
+      res.status(404).json({ success: false, message: 'Không tìm thấy tin nhắn.' });
+    }
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Lỗi server.' });
   }
 });
 

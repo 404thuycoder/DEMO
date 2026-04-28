@@ -9,7 +9,19 @@
   var routeLayer = null; // Layer vẽ đường đi OSRM
   var transportMode = "driving"; // "driving" (ô tô) hoặc "motorcycle" (xe máy)
 
+  function debounce(func, wait) {
+    var timeout;
+    return function() {
+      var context = this, args = arguments;
+      clearTimeout(timeout);
+      timeout = setTimeout(function() {
+        func.apply(context, args);
+      }, wait);
+    };
+  }
+
   function loadPlacesFromAPI() {
+    renderSkeletons();
     return fetch('/api/places').then(function (res) {
       return res.json();
     }).then(function (json) {
@@ -25,6 +37,8 @@
         PLACES = window.WANDER_PLACES;
       }
       return false;
+    }).finally(function() {
+      renderDestCards();
     });
   }
 
@@ -131,6 +145,7 @@
     all[email] = profile;
     saveJSON(STORAGE.profile, all);
   }
+  window.WanderUI_getProfile = getProfile;
 
   // --- UI Elements ---
   var userBubble = document.querySelector("[data-user-bubble]");
@@ -202,6 +217,17 @@
     var i = w.indexOf(placeId);
     if (i === -1) w.push(placeId);else w.splice(i, 1);
     setWishlist(w);
+
+    // Sync to user profile if logged in
+    var token = localStorage.getItem("wander_token");
+    if (token) {
+      fetch('/api/auth/user/sync-favorites', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-auth-token': token },
+        body: JSON.stringify({ favorites: w })
+      }).catch(err => console.debug('Sync favorites failed:', err));
+    }
+    
     return i === -1;
   }
   function budgetLabel(n) {
@@ -232,9 +258,12 @@
     var ints = prefs.interests || [];
     ints.forEach(function (it) {
       var low = normalize(it);
-      var hit = place.tags.some(function (t) {
+      var tags = Array.isArray(place.tags) ? place.tags : [];
+      var interests = Array.isArray(place.interests) ? place.interests : [];
+      
+      var hit = tags.some(function (t) {
         return normalize(t).indexOf(low) !== -1;
-      }) || (place.interests || []).some(function (x) {
+      }) || interests.some(function (x) {
         return normalize(x).indexOf(low) !== -1;
       });
       if (hit) {
@@ -299,7 +328,7 @@
 
   /* ——— Modals ——— */
   var backdrop = document.querySelector("[data-modal-backdrop]");
-  function openModal(name) {
+  window.openModal = function(name) {
     var m = document.querySelector('[data-modal="' + name + '"]');
     if (!m) return;
     m.hidden = false;
@@ -566,111 +595,11 @@
       }
     }
   }
-  function toggleUserMenu(open) {
-    if (!userToggle) return;
-    // Re-query userDropdown each time in case of DOM updates
-    var dd = document.querySelector('[data-user-dropdown]');
-    if (!dd) return;
-    if (open) {
-      dd.hidden = false;
-      dd.removeAttribute('hidden');
-      userToggle.setAttribute("aria-expanded", "true");
-    } else {
-      dd.hidden = true;
-      userToggle.setAttribute("aria-expanded", "false");
-    }
-  }
-  if (userToggle) {
-    userToggle.addEventListener("click", function (e) {
-      e.stopPropagation();
-      var dd = document.querySelector('[data-user-dropdown]');
-      var isOpen = dd && !dd.hidden;
-      toggleUserMenu(!isOpen);
-    });
-    document.addEventListener("click", function (e) {
-      if (!userBubble || !userBubble.contains(e.target)) {
-        toggleUserMenu(false);
-      }
-    });
-  }
 
-  /* Đảm bảo click link trong dropdown không bị xử lý nhầm; đóng menu trước khi điều hướng */
-  (function bindUserDropdownLinks() {
-    var dd = document.querySelector("[data-user-dropdown]");
-    if (!dd) return;
-    dd.querySelectorAll('a[href]').forEach(function (a) {
-      a.addEventListener("click", function () {
-        toggleUserMenu(false);
-      });
-    });
-  })();
-  if (openProfileBtn) {
-    openProfileBtn.addEventListener("click", function () {
-      toggleUserMenu(false);
-      var sess = getSession();
-      if (!sess || !sess.email) return;
-      var profileTab = document.querySelector('[data-settings-tab="profile"]');
-      if (profileTab) profileTab.click();
-      var f = document.querySelector("[data-profile-form-v2]");
-      if (f) {
-        var p = getProfile();
-        if (f.elements.displayName) f.elements.displayName.value = p.displayName || p.name || "";
-        if (f.elements.notes) f.elements.notes.value = p.notes || "";
-        if (f.elements.phone) f.elements.phone.value = p.phone || "";
-        var fileInput = f.querySelector("[data-avatar-file-input]");
-        if (fileInput) fileInput.value = "";
-        applyAvatarPreview(p.avatar || null);
-      }
-      openModal("settings");
-    });
-  }
-  if (openSettingsBtn) openSettingsBtn.addEventListener("click", function () {
-    toggleUserMenu(false);
-    var sess = getSession();
-    var isAuth = sess && sess.email;
+  // Redundant menu listeners removed. Handled globally by SharedUI.js
 
-    // Auto-switch to Appearance tab if not logged in
-    var appearanceTab = document.querySelector('[data-settings-tab="appearance"]');
-    var profileTab = document.querySelector('[data-settings-tab="profile"]');
-    if (!isAuth && appearanceTab) {
-      appearanceTab.click();
-    } else if (isAuth && profileTab) {
-      profileTab.click();
-    }
-    var f = document.querySelector("[data-profile-form-v2]");
-    if (f && isAuth) {
-      var p = getProfile();
-      if (f.elements.displayName) f.elements.displayName.value = p.displayName || p.name || "";
-      if (f.elements.notes) f.elements.notes.value = p.notes || "";
-      if (f.elements.phone) f.elements.phone.value = p.phone || "";
-      var fileInput = f.querySelector('[data-avatar-file-input]');
-      if (fileInput) fileInput.value = '';
-      applyAvatarPreview(p.avatar || null);
-    }
-    openModal("settings");
-  });
 
-  // Settings Tab Switching
-  var settingsTabs = document.querySelectorAll("[data-settings-tab]");
-  var settingsPanels = document.querySelectorAll("[data-settings-panel]");
-  settingsTabs.forEach(function (tab) {
-    tab.addEventListener("click", function () {
-      var target = this.getAttribute("data-settings-tab");
-      settingsTabs.forEach(function (t) {
-        t.classList.remove("is-active");
-      });
-      settingsPanels.forEach(function (p) {
-        p.hidden = true;
-        p.classList.remove("is-active");
-      });
-      this.classList.add("is-active");
-      var activePanel = document.querySelector('[data-settings-panel="' + target + '"]');
-      if (activePanel) {
-        activePanel.hidden = false;
-        activePanel.classList.add("is-active");
-      }
-    });
-  });
+
 
   // Theme Switching Logic
   var themeOptions = document.querySelectorAll("[data-theme-set]");
@@ -1057,22 +986,71 @@
   function wishIsOn(id) {
     return getWishlist().indexOf(id) !== -1;
   }
-  function renderDestCards() {
+  function renderSkeletons() {
     if (!destGrid) return;
     destGrid.innerHTML = "";
-    PLACES.forEach(function (p) {
-      var tags = (p.tags || []).join(" ");
-      var art = document.createElement("article");
-      art.className = "dest-card";
-      art.setAttribute("data-tags", tags);
-      art.setAttribute("data-place-id", p.id);
-      var topBadge = p.top ? '<span class="dest-badge">Top</span>' : "";
-      var verifiedBadge = p.verified ? '<div class="verified-badge"><span class="icon">🛡️</span> Verified</div>' : '';
-      var wOn = wishIsOn(p.id) ? " is-on" : "";
-      var displayImg = p.images && p.images.length > 0 ? p.images[0] : p.image;
-      art.innerHTML = '<div class="dest-card-media" style="--img: url(\'' + String(displayImg).replace(/'/g, "\\'") + "');\">" + topBadge + verifiedBadge + '</div><div class="dest-card-body"><div class="dest-meta-row">' + '<span class="dest-pill">' + budgetLabel(p.budget) + '</span><span class="dest-pill">' + paceVi(p.pace) + '</span></div><h3 class="dest-card-title">' + escapeHtml(p.name) + '</h3><p class="dest-card-meta">' + escapeHtml(p.region) + " · " + escapeHtml(p.meta) + '</p><p class="dest-card-text">' + escapeHtml(p.text) + '</p><div class="dest-card-actions">' + '<button type="button" class="btn btn--ghost btn--small dest-wish' + wOn + '" data-wish="' + escapeAttr(p.id) + '">' + (wishIsOn(p.id) ? '♥ Đã lưu' : '♡ Yêu thích') + (p.favoritesCount ? ' <span class="wish-count">' + p.favoritesCount + '</span>' : '') + '</button><button type="button" class="btn btn--primary btn--small" data-detail="' + escapeAttr(p.id) + '">Chi tiết</button>' + '<button type="button" class="btn btn--ghost btn--small btn-add-trip" data-add-stop-id="' + escapeAttr(p.id) + '">+ Lịch</button></div></div>';
-      destGrid.appendChild(art);
-    });
+    for (var i = 0; i < 6; i++) {
+      var s = document.createElement("div");
+      s.className = "skeleton-card";
+      s.innerHTML = '<div class="skeleton-img skeleton"></div>' +
+                    '<div class="skeleton-title skeleton"></div>' +
+                    '<div class="skeleton-text skeleton"></div>' +
+                    '<div class="skeleton-text skeleton" style="width:50%"></div>';
+      destGrid.appendChild(s);
+    }
+  }
+
+  function renderDestCards() {
+    if (!destGrid) return;
+    try {
+      destGrid.innerHTML = "";
+      if (PLACES.length === 0) {
+        destGrid.innerHTML = '<p class="section-desc">Không có dữ liệu điểm đến.</p>';
+        return;
+      }
+      PLACES.forEach(function (p) {
+        var tags = (p.tags || []).join(" ");
+        var art = document.createElement("article");
+        art.className = "dest-card";
+        art.setAttribute("data-tags", tags);
+        art.setAttribute("data-place-id", p.id);
+        var topBadge = p.top ? '<span class="dest-badge">Top</span>' : "";
+        var verifiedBadge = p.verified ? '<div class="verified-badge"><span class="icon">🛡️</span> Verified</div>' : '';
+        var wOn = wishIsOn(p.id) ? " is-on" : "";
+        var displayImg = p.images && p.images.length > 0 ? p.images[0] : p.image;
+        var favCount = parseInt(p.favoritesCount) || 0;
+        if (wishIsOn(p.id) && favCount === 0) favCount = 1; // Đảm bảo hiện ít nhất 1 nếu đã lưu
+        
+        var wishHtml = '<button type="button" class="btn btn--ghost btn--small dest-wish' + wOn + '" data-wish="' + escapeAttr(p.id) + '">' + 
+                       (wishIsOn(p.id) ? '♥ Đã lưu' : '♡ Yêu thích') + 
+                       (favCount > 0 ? ' <span class="wish-count">' + favCount + '</span>' : '') + 
+                       '</button>';
+        
+        art.innerHTML = '<div class="dest-card-media">' + 
+                          '<img src="' + (displayImg || '') + '" loading="lazy" alt="' + escapeAttr(p.name || '') + '" class="dest-card-img" />' +
+                          topBadge + verifiedBadge + 
+                        '</div>' +
+                       '<div class="dest-card-body">' +
+                         '<div class="dest-meta-row">' +
+                           '<span class="dest-pill">' + budgetLabel(p.budget) + '</span>' +
+                           '<span class="dest-pill">' + paceVi(p.pace) + '</span>' +
+                         '</div>' +
+                         '<h3 class="dest-card-title">' + escapeHtml(p.name || '') + '</h3>' +
+                         '<p class="dest-card-meta">' + escapeHtml(p.region || '') + " · " + escapeHtml(p.meta || '') + '</p>' +
+                         '<p class="dest-card-text">' + escapeHtml(p.text || '') + '</p>' +
+                         '<div class="dest-card-actions">' +
+                           wishHtml +
+                           '<button type="button" class="btn btn--primary btn--small" data-detail="' + escapeAttr(p.id) + '">Chi tiết</button>' +
+                           '<button type="button" class="btn btn--ghost btn--small btn-add-trip" data-add-stop-id="' + escapeAttr(p.id) + '">+ Lịch</button>' +
+                         '</div>' +
+                       '</div>';
+        destGrid.appendChild(art);
+      });
+      // Re-apply filters if any
+      if (typeof applyDestFilters === 'function') applyDestFilters();
+    } catch (err) {
+      console.error('Error in renderDestCards:', err);
+    }
   }
   function cardMatchesFilter(card, filter) {
     if (filter === "all") return true;
@@ -1109,39 +1087,53 @@
         var id = w.getAttribute("data-wish");
         var on = toggleWish(id);
         w.classList.toggle("is-on", on);
-        // Gọi API MongoDB để cập nhật lượt yêu thích
+        
+        // Cập nhật UI ngay lập tức (Optimistic Update)
+        var place = PLACES.find(function (p) { return p.id === id; });
+        var currentCount = 0;
+        if (place) {
+          // Ép kiểu số để tránh lỗi nối chuỗi
+          var baseCount = parseInt(place.favoritesCount) || 0;
+          if (on) currentCount = baseCount + 1;
+          else currentCount = Math.max(0, baseCount - 1);
+          place.favoritesCount = currentCount;
+        } else {
+          // Nếu không tìm thấy trong PLACES (hiếm), giả định ít nhất là 1 khi bật
+          currentCount = on ? 1 : 0;
+        }
+        
+        var updateBtnUI = function(count) {
+          var icon = on ? '♥' : '♡';
+          var label = on ? 'Đã lưu' : 'Yêu thích';
+          // Luôn hiển thị số nếu > 0 để người dùng thấy rõ sự thay đổi
+          var countHtml = (count > 0) ? ' <span class="wish-count">' + count + '</span>' : '';
+          w.innerHTML = icon + ' ' + label + countHtml;
+        };
+        
+        updateBtnUI(currentCount);
+
+        // Gọi API MongoDB để đồng bộ
         fetch('/api/places/' + id + '/favorite', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            action: on ? 'add' : 'remove'
-          })
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: on ? 'add' : 'remove' })
         }).then(function (res) {
           return res.json();
         }).then(function (json) {
           if (json.success) {
-            // Cập nhật count trong mảng PLACES
-            var place = PLACES.find(function (p) {
-              return p.id === id;
-            });
-            if (place) place.favoritesCount = json.favoritesCount;
-            // Cập nhật hiển thị chỉ số lượt thích trên nút
-            var countEl = w.querySelector('.wish-count');
-            if (json.favoritesCount > 0) {
-              if (!countEl) {
-                countEl = document.createElement('span');
-                countEl.className = 'wish-count';
-                w.appendChild(countEl);
-              }
-              countEl.textContent = json.favoritesCount;
-            } else if (countEl) {
-              countEl.remove();
-            }
+            var serverCount = parseInt(json.favoritesCount) || 0;
+            if (place) place.favoritesCount = serverCount;
+            updateBtnUI(serverCount); 
           }
-        }).catch(function () {});
-        w.innerHTML = (on ? '♥ Đã lưu' : '♡ Yêu thích') + (w.querySelector('.wish-count') ? ' <span class="wish-count">' + (w.querySelector('.wish-count').textContent || '') + '</span>' : '');
+        }).catch(function (err) {
+          console.error("Favorite API Error:", err);
+          // Rollback nếu lỗi kết nối
+          if (place) {
+            if (on) place.favoritesCount -= 1;
+            else place.favoritesCount += 1;
+            updateBtnUI(place.favoritesCount);
+          }
+        });
       }
       var a = t.closest("[data-add-stop-id]");
       if (a) {
@@ -1162,7 +1154,7 @@
     });
   });
   if (searchInput) {
-    searchInput.addEventListener("input", applyDestFilters);
+    searchInput.addEventListener("input", debounce(applyDestFilters, 300));
     var searchForm = searchInput.closest("form");
     if (searchForm) searchForm.addEventListener("submit", function (e) {
       e.preventDefault();
@@ -1273,295 +1265,262 @@
         return '📍';
     }
   }
-  function openPlaceModal(id) {
-    var p = PLACES.find(function (x) {
-      return x.id === id;
-    });
-    if (!p) return;
+  window.openPlaceModal = function(id) {
     var wrap = document.querySelector("[data-place-detail]");
     if (!wrap) return;
 
-    // Helper to render small cards
-    function createCardHtml(item, type, idx) {
-      var subtitle = "";
-      if (type === 'amusementPlaces') subtitle = "⭐ " + item.rating + "/5";else if (type === 'accommodations') subtitle = "🏨 " + (item.priceRange || "Liên hệ");else if (type === 'diningPlaces') subtitle = "🍴 " + (item.priceRange || "Giá bình dân");else if (type === 'checkInSpots') subtitle = "📸 Điểm check-in nổi tiếng";
-      return '<div class="detail-item-card" data-category="' + type + '" data-idx="' + idx + '">' + '<div class="detail-item-img" style="background-image:url(\'' + escapeAttr(item.image) + '\')"></div>' + '<div class="detail-item-info">' + '<h4 class="detail-item-title">' + escapeHtml(item.name) + '</h4>' + '<div class="detail-item-subtitle">' + subtitle + '</div>' + '</div>' + '</div>';
-    }
-
-    // Helper to render section
-    function renderSection(title, list, type, emoji) {
-      if (!list || !list.length) return "";
-      var cardsHtml = list.map(function (item, idx) {
-        return createCardHtml(item, type, idx);
-      }).join("");
-      return '<div class="place-detail__section">' + '<h4 class="detail-section-title">' + emoji + ' ' + title + '</h4>' + '<div class="detail-card-grid">' + cardsHtml + '</div>' + '</div>';
-    }
-    var acts = (p.activities || []).map(function (a) {
-      return '<div class="act-row"><strong>' + escapeHtml(a.dayPart) + ": " + escapeHtml(a.title) + "</strong>" + escapeHtml(a.tip) + "</div>";
-    }).join("");
-    var sectionsHtml = renderSection("Các địa điểm vui chơi", p.amusementPlaces, "amusementPlaces", "🎢") + renderSection("Nơi nghỉ ngơi lý tưởng", p.accommodations, "accommodations", "🛌") + renderSection("Địa điểm ăn uống", p.diningPlaces, "diningPlaces", "🍲") + renderSection("Điểm check-in nổi tiếng", p.checkInSpots, "checkInSpots", "🤳");
-    var verifiedBadge = p.verified ? '<div class="verified-badge" style="display:inline-flex; vertical-align:middle; margin-left:0.5rem; padding:0.2rem 0.6rem; font-size:0.75rem;"><span class="icon" style="margin-right:4px">🛡️</span> Đã kiểm chứng' + (p.sourceName ? ' bởi <a href="' + escapeAttr(p.sourceUrl || '#') + '" target="_blank" style="color:inherit; text-decoration:underline; margin-left:4px">' + escapeHtml(p.sourceName) + '</a>' : '') + '</div>' : '';
-    var heroImage = p.images && p.images.length > 0 ? p.images[0] : p.image;
-    var placeViewHtml = '<div class="place-view-content">' + '<div class="place-detail__media" style="background-image:url(' + JSON.stringify(heroImage) + ')"></div>' + '<h3 class="place-detail__title" style="display:flex; align-items:center; flex-wrap:wrap; gap:0.5rem;">' + escapeHtml(p.name) + verifiedBadge + '</h3><p class="place-detail__meta">' + escapeHtml(p.region) + " · " + budgetLabel(p.budget) + " · " + paceVi(p.pace) + '</p><p style="color:var(--text-muted)">' + escapeHtml(p.text) + '</p><p style="margin-top:1rem"><strong>Di chuyển:</strong> ' + escapeHtml(p.transportTips || "") + '</p>' + (p.sourceUrl ? '<p style="margin-top:0.5rem;font-size:0.9rem;"><strong>Nguồn tham khảo:</strong> <a href="' + escapeAttr(p.sourceUrl) + '" target="_blank" rel="noopener noreferrer" style="color:var(--accent);text-decoration:underline;">' + escapeHtml(p.sourceName || "Website chính thức") + '</a></p>' : "") + '<div class="place-detail__activities">' + acts + '</div>' + sectionsHtml + '<div id="place-map" style="height:250px; border-radius:12px; margin-top:2rem; border:1px solid rgba(148,163,184,0.2); display:none;"></div>' + '<div class="dest-card-actions" style="margin-top:1.5rem">' + '<button type="button" class="btn btn--primary btn--small" data-modal-add="' + escapeAttr(p.id) + '">Thêm vào lịch</button>' + '<button type="button" class="btn btn--ghost btn--small" data-modal-wish="' + escapeAttr(p.id) + '">' + (wishIsOn(p.id) ? '♥ Đã lưu' : '♡ Yêu thích') + (p.favoritesCount ? ' <span class="wish-count">' + p.favoritesCount + '</span>' : '') + '</button></div></div>';
-    wrap.innerHTML = placeViewHtml + '<div class="am-view-content" style="display:none;"></div>';
-    var pv = wrap.querySelector('.place-view-content');
-    var av = wrap.querySelector('.am-view-content');
-    wrap.querySelectorAll('.detail-item-card').forEach(function (card) {
-      card.addEventListener('click', function () {
-        var cat = this.getAttribute('data-category');
-        var idx = this.getAttribute('data-idx');
-        var item = p[cat][idx];
-        if (!item) return;
-
-        // Custom details based on type
-        var extraInfo = "";
-        if (cat === 'amusementPlaces') {
-          extraInfo = '<div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap:1rem;">' + '<div style="background:rgba(255,255,255,0.03); padding:1rem; border-radius:12px; border:1px solid rgba(255,255,255,0.05);">' + '<h4 style="color:#10b981; margin:0 0 0.5rem; font-size:0.85rem;">⏰ Giờ mở cửa</h4>' + '<p style="margin:0; font-size:0.9rem; font-weight:600;">' + escapeHtml(item.openingHours || 'Liên hệ') + '</p>' + '</div>' + '<div style="background:rgba(255,255,255,0.03); padding:1rem; border-radius:12px; border:1px solid rgba(255,255,255,0.05);">' + '<h4 style="color:#f43f5e; margin:0 0 0.5rem; font-size:0.85rem;">🎟️ Giá vé</h4>' + '<p style="margin:0; font-size:0.9rem; font-weight:600;">' + escapeHtml(item.ticketPrice || 'Liên hệ') + '</p>' + '</div>' + '</div>';
-        } else if (cat === 'accommodations' || cat === 'diningPlaces') {
-          extraInfo = '<div style="background:rgba(255,255,255,0.03); padding:1rem; border-radius:12px; border:1px solid rgba(255,255,255,0.05);">' + '<h4 style="color:#10b981; margin:0 0 0.4rem; font-size:0.85rem;">💰 Khoảng giá</h4>' + '<p style="margin:0; font-size:0.9rem; font-weight:600;">' + escapeHtml(item.priceRange || 'Đang cập nhật') + '</p>' + '</div>';
-        }
-        var detailedHtml = '<div style="animation: fadeIn 0.3s ease;">' + '<div style="padding-bottom:1rem; border-bottom:1px solid rgba(255,255,255,0.1); margin-bottom:1rem; display:flex; justify-content:space-between; align-items:center;">' + '<button type="button" class="btn btn--ghost btn--small btn-back-am" style="font-weight:600;">← Trở về</button>' + '<button type="button" class="btn btn--primary btn--small btn-add-am" style="font-weight:600;">+ Lịch trình</button>' + '</div>' + '<div class="place-detail__media" style="background-image:url(\'' + escapeAttr(item.image) + '\'); height:280px; border-radius:16px;"></div>' + '<h3 class="place-detail__title" style="margin-top:1.5rem; font-size:1.4rem;">' + escapeHtml(item.name) + '</h3>' + '<div style="color:#fbbf24; font-weight:700; margin-bottom:0.75rem;">⭐ ' + (item.rating || '4.5') + ' / 5.0</div>' + '<p style="color:var(--text-muted); line-height:1.6; margin-bottom:1.5rem;">' + escapeHtml(item.description || '') + '</p>' + '<div style="background:rgba(255,255,255,0.03); padding:1rem; border-radius:12px; border:1px solid rgba(255,255,255,0.05); margin-bottom:1rem;">' + '<h4 style="color:var(--accent); margin:0 0 0.4rem; font-size:0.85rem;">📍 Địa chỉ</h4>' + '<p style="margin:0; font-size:0.9rem;">' + escapeHtml(item.address || p.region) + '</p>' + '</div>' + extraInfo + '<div style="margin-top:1.5rem; display:flex; justify-content:center;">' + '<a href="https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(item.name + ' ' + (item.address || p.region)) + '" target="_blank" rel="noopener noreferrer" class="btn btn--outline btn--block" style="text-align:center;">🗺️ Xem trên Google Maps</a>' + '</div>' + '</div>';
-        av.innerHTML = detailedHtml;
-        av.querySelector('.btn-back-am').addEventListener('click', function () {
-          av.style.display = 'none';
-          pv.style.display = 'block';
-          wrap.scrollTop = 0;
-        });
-        var btnAddAm = av.querySelector('.btn-add-am');
-        if (btnAddAm) {
-          btnAddAm.addEventListener('click', function (e) {
-            e.stopPropagation();
-            var customId = 'item-' + Date.now();
-            var newPlace = {
-              id: customId,
-              name: item.name,
-              region: p.region,
-              lat: p.lat,
-              lng: p.lng,
-              image: item.image,
-              text: item.description,
-              tags: ["tùy chỉnh"],
-              isCustom: true
-            };
-            if (!window._CUSTOM_PLACES) window._CUSTOM_PLACES = {};
-            window._CUSTOM_PLACES[customId] = newPlace;
-            addStopById(customId);
-            this.innerHTML = '✔ Đã thêm';
-            this.classList.replace('btn--primary', 'btn--ghost');
-            this.style.color = '#10b981';
-            this.style.pointerEvents = 'none';
-          });
-        }
-        pv.style.display = 'none';
-        av.style.display = 'block';
-        wrap.scrollTop = 0;
-      });
-    });
-    wrap.querySelector("[data-modal-add]").addEventListener("click", function () {
-      addStopById(p.id);
-      closeModals();
-      var pl = document.getElementById("planner");
-      if (pl) pl.scrollIntoView({
-        behavior: "smooth"
-      });
-    });
-    wrap.querySelector("[data-modal-wish]").addEventListener("click", function () {
-      var id = p.id;
-      var on = toggleWish(id);
-      var wb = wrap.querySelector("[data-modal-wish]");
-      wb.innerHTML = (on ? '♥ Đã lưu' : '♡ Yêu thích') + (p.favoritesCount ? ' <span class="wish-count">' + p.favoritesCount + '</span>' : '');
-      fetch('/api/places/' + id + '/favorite', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          action: on ? 'add' : 'remove'
-        })
-      }).then(function (res) {
-        return res.json();
-      }).then(function (json) {
-        if (json.success) {
-          p.favoritesCount = json.favoritesCount;
-          if (wb) wb.innerHTML = (on ? '♥ Đã lưu' : '♡ Yêu thích') + (p.favoritesCount ? ' <span class="wish-count">' + p.favoritesCount + '</span>' : '');
-          renderDestCards();
-          applyDestFilters();
-          renderPersonalSection();
-        }
-      }).catch(function () {});
-    });
+    wrap.innerHTML = '<div class="modal-loading-placeholder"><div class="skeleton-title skeleton" style="width:40%; margin-left:0;"></div><div class="skeleton-img skeleton" style="height:280px; border-radius:24px;"></div><div class="skeleton-text skeleton"></div><div class="skeleton-text skeleton" style="width:70%"></div></div>';
     openModal("place");
 
-    // Tự động khởi tạo bản đồ
-    setTimeout(function () {
-      var mapEl = document.getElementById("place-map");
-      if (!mapEl || !p.lat || !p.lng || typeof L === 'undefined') return;
-      mapEl.style.display = "block";
-      mapEl.style.height = "350px";
-      mapEl.style.position = "relative";
-      if (window._placeMapInstance) {
-        window._placeMapInstance.remove();
-        window._placeMapInstance = null;
+    fetch('/api/places/' + id).then(function(r) { return r.json(); }).then(function(json) {
+      if (!json.success || !json.data) {
+        wrap.innerHTML = '<p style="padding:2rem; text-align:center;">Không tìm thấy thông tin chi tiết.</p>';
+        return;
       }
-      window._placeMapInstance = L.map("place-map", {
-        scrollWheelZoom: false
-      }).setView([p.lat, p.lng], 14);
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-        attribution: '&copy; OpenStreetMap'
-      }).addTo(window._placeMapInstance);
+      var p = json.data;
 
-      // Nhóm các layer
-      var layers = {
-        playing: L.layerGroup().addTo(window._placeMapInstance),
-        eating: L.layerGroup().addTo(window._placeMapInstance),
-        sleeping: L.layerGroup().addTo(window._placeMapInstance),
-        attraction: L.layerGroup().addTo(window._placeMapInstance)
-      };
+      var heroImage = (p.images && p.images.length > 0) ? p.images[0] : (p.image || "");
+      var galleryHtml = "";
+      if (p.images && p.images.length > 1) {
+        galleryHtml = '<div class="place-detail__gallery">' + p.images.map(function(img, i) {
+          return '<div class="gallery-thumb' + (i===0?' is-active':'') + '" data-full="' + escapeAttr(img) + '"><img src="' + escapeAttr(img) + '" alt="Thumbnail"></div>';
+        }).join("") + '</div>';
+      }
 
-      // Thêm Legend
-      var legend = document.createElement('div');
-      legend.className = 'map-legend';
-      legend.innerHTML = '<div class="legend-loading">Đang tìm địa điểm xung quanh...</div>' + '<div class="legend-item" data-layer="playing"><div class="legend-dot" style="background:#f43f5e"></div> Vui chơi</div>' + '<div class="legend-item" data-layer="eating"><div class="legend-dot" style="background:#f59e0b"></div> Ăn uống</div>' + '<div class="legend-item" data-layer="sleeping"><div class="legend-dot" style="background:#10b981"></div> Nghỉ ngơi</div>' + '<div class="legend-item" data-layer="attraction"><div class="legend-dot" style="background:#0ea5e9"></div> Tham quan</div>';
-      mapEl.appendChild(legend);
+      var acts = (p.activities || []).map(function (a) {
+        var color = "#38bdf8"; // default blue
+        if (a.dayPart.toLowerCase().indexOf("sáng") !== -1) color = "#fbbf24"; // amber
+        if (a.dayPart.toLowerCase().indexOf("chiều") !== -1) color = "#f43f5e"; // rose
+        if (a.dayPart.toLowerCase().indexOf("tối") !== -1) color = "#818cf8"; // indigo
 
-      // Event listener cho legend
-      legend.querySelectorAll('.legend-item').forEach(function (item) {
-        item.addEventListener('click', function (e) {
-          e.stopPropagation();
-          var layerName = this.getAttribute('data-layer');
-          var layer = layers[layerName];
-          if (window._placeMapInstance.hasLayer(layer)) {
-            window._placeMapInstance.removeLayer(layer);
-            this.classList.add('is-inactive');
-          } else {
-            window._placeMapInstance.addLayer(layer);
-            this.classList.remove('is-inactive');
-          }
+        return '<div class="act-row-v2">' + 
+                 '<div class="act-dot" style="background:' + color + '"></div>' +
+                 '<div class="act-content">' +
+                   '<strong style="color:' + color + '">' + escapeHtml(a.dayPart) + ': ' + escapeHtml(a.title) + '</strong>' +
+                   '<p>' + escapeHtml(a.tip) + '</p>' +
+                 '</div>' +
+               '</div>';
+      }).join("");
+
+      function createCardHtml(item, type, idx) {
+        var subtitle = "";
+        if (type === 'amusementPlaces') subtitle = "⭐ " + (item.rating || 5) + "/5";
+        else if (type === 'accommodations') subtitle = "🏨 " + (item.priceRange || "Liên hệ");
+        else if (type === 'diningPlaces') subtitle = "🍲 " + (item.priceRange || "Giá bình dân");
+        else if (type === 'checkInSpots') subtitle = "📸 Điểm check-in nổi tiếng";
+        
+        return '<div class="detail-item-card" data-category="' + type + '" data-idx="' + idx + '">' + 
+               '<div class="detail-item-img"><img src="' + escapeAttr(item.image) + '" alt="' + escapeAttr(item.name) + '" loading="lazy"></div>' + 
+               '<div class="detail-item-info">' + 
+                 '<h4 class="detail-item-title">' + escapeHtml(item.name) + '</h4>' + 
+                 '<div class="detail-item-subtitle">' + subtitle + '</div>' + 
+               '</div>' + 
+               '</div>';
+      }
+
+      function renderSection(title, list, type, emoji) {
+        if (!list || !list.length) return "";
+        var cardsHtml = list.map(function (item, idx) { return createCardHtml(item, type, idx); }).join("");
+        return '<div class="place-detail__section">' + 
+                 '<h4 class="detail-section-title">' + emoji + ' ' + title + '</h4>' + 
+                 '<div class="detail-card-grid">' + cardsHtml + '</div>' + 
+               '</div>';
+      }
+
+      var sectionsHtml = renderSection("Các địa điểm vui chơi", p.amusementPlaces, "amusementPlaces", "🎢") + 
+                         renderSection("Nơi nghỉ ngơi lý tưởng", p.accommodations, "accommodations", "🛌") + 
+                         renderSection("Địa điểm ăn uống", p.diningPlaces, "diningPlaces", "🍲") + 
+                         renderSection("Điểm check-in nổi tiếng", p.checkInSpots, "checkInSpots", "🤳");
+
+      var verifiedBadge = p.verified ? '<div class="verified-badge-v2"><span class="icon">🛡️</span> Đã kiểm chứng' + (p.sourceName ? ' bởi ' + escapeHtml(p.sourceName) : '') + '</div>' : '';
+      
+      var placeViewHtml = '<div class="place-view-content animate-in">' + 
+          '<div class="place-detail__hero">' +
+            '<img src="' + escapeAttr(heroImage) + '" class="hero-main-img" id="hero-target">' +
+            verifiedBadge +
+          '</div>' +
+          galleryHtml +
+          '<div class="place-detail__info-wrap">' +
+            '<h3 class="place-detail__title-v2">' + escapeHtml(p.name) + '</h3>' +
+            '<p class="place-detail__meta-v2">📍 ' + escapeHtml(p.region) + " · " + budgetLabel(p.budget) + " · " + paceVi(p.pace) + '</p>' +
+            '<div class="place-detail__desc">' + escapeHtml(p.text || "") + '</div>' +
+            '<div class="place-detail__guide">' +
+              '<p><strong>🚗 Di chuyển:</strong> ' + escapeHtml(p.transportTips || "Thông tin đang cập nhật...") + '</p>' + 
+              (p.sourceUrl ? '<p><strong>🔗 Tham khảo:</strong> <a href="' + escapeAttr(p.sourceUrl) + '" target="_blank">' + escapeHtml(p.sourceName || "Website chính thức") + '</a></p>' : "") + 
+            '</div>' +
+          '</div>' +
+          '<div class="place-detail__activities-v2">' + 
+            '<h4 class="detail-section-title">📅 Lịch trình gợi ý</h4>' +
+            acts + 
+          '</div>' + 
+          sectionsHtml + 
+          '<div id="place-map" class="place-detail__map-v2"></div>' + 
+          '<div class="place-detail__actions-v2">' + 
+            '<button type="button" class="btn btn--primary" data-modal-add="' + escapeAttr(p.id) + '">Thêm vào lịch trình</button>' + 
+            '<button type="button" class="btn btn--ghost" data-modal-wish="' + escapeAttr(p.id) + '">' + (wishIsOn(p.id) ? '♥ Đã lưu' : '♡ Yêu thích') + (p.favoritesCount ? ' <span class="wish-count">' + p.favoritesCount + '</span>' : '') + '</button>' +
+          '</div>' +
+        '</div>';
+
+      wrap.innerHTML = placeViewHtml + '<div class="am-view-content" style="display:none;"></div>';
+      
+      // Gallery interaction
+      wrap.querySelectorAll('.gallery-thumb').forEach(function(thumb) {
+        thumb.addEventListener('click', function() {
+          var target = wrap.querySelector('#hero-target');
+          if (target) target.src = this.getAttribute('data-full');
+          wrap.querySelectorAll('.gallery-thumb').forEach(function(t) { t.classList.remove('is-active'); });
+          this.classList.add('is-active');
         });
       });
 
-      // Marker chính cho địa điểm
-      var mainIcon = L.divIcon({
-        className: 'main-dest-marker',
-        html: "<div style='background-color:var(--accent); width:20px; height:20px; border-radius:50%; border:4px solid white; box-shadow:0 0 15px var(--accent);'></div>",
-        iconSize: [24, 24],
-        iconAnchor: [12, 12]
+      // Item card interactions
+      var pv = wrap.querySelector('.place-view-content');
+      var av = wrap.querySelector('.am-view-content');
+      wrap.querySelectorAll('.detail-item-card').forEach(function (card) {
+        card.addEventListener('click', function () {
+          var cat = this.getAttribute('data-category');
+          var idx = this.getAttribute('data-idx');
+          var item = p[cat][idx];
+          if (!item) return;
+          var detailedHtml = '<div class="am-detail-view animate-in">' + 
+              '<button type="button" class="btn btn--ghost btn-back-am">← Quay lại</button>' + 
+              '<div class="am-detail-media"><img src="' + escapeAttr(item.image) + '"></div>' + 
+              '<h3 class="am-detail-title">' + escapeHtml(item.name) + '</h3>' + 
+              '<div class="am-detail-rating">⭐ ' + (item.rating || '4.5') + ' / 5.0</div>' + 
+              '<p class="am-detail-desc">' + escapeHtml(item.description || '') + '</p>' + 
+              '<div class="am-detail-meta-box">📍 ' + escapeHtml(item.address || p.region) + '</div>' + 
+              '<a href="https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(item.name + ' ' + (item.address || p.region)) + '" target="_blank" class="btn btn--outline btn--block">Xem trên bản đồ</a>' + 
+              '</div>';
+          av.innerHTML = detailedHtml;
+          av.querySelector('.btn-back-am').addEventListener('click', function () { av.style.display='none'; pv.style.display='block'; wrap.scrollTop=0; });
+          pv.style.display = 'none'; av.style.display = 'block'; wrap.scrollTop = 0;
+        });
       });
-      L.marker([p.lat, p.lng], {
-        icon: mainIcon
-      }).bindPopup('<b>' + escapeHtml(p.name) + '</b><br>Tâm điểm du lịch').addTo(window._placeMapInstance);
 
-      // --- HYBRID STRATEGY: PLOT STATIC DATA IMMEDIATELY ---
-      function plotStaticPOIs() {
-        var staticItems = [];
-        if (p.amusementPlaces) p.amusementPlaces.forEach(function (item) {
-          var copy = Object.assign({}, item);
-          copy.cat = 'playing';
-          staticItems.push(copy);
-        });
-        if (p.accommodations) p.accommodations.forEach(function (item) {
-          var copy = Object.assign({}, item);
-          copy.cat = 'sleeping';
-          staticItems.push(copy);
-        });
-        if (p.diningPlaces) p.diningPlaces.forEach(function (item) {
-          var copy = Object.assign({}, item);
-          copy.cat = 'eating';
-          staticItems.push(copy);
-        });
-        if (p.checkInSpots) p.checkInSpots.forEach(function (item) {
-          var copy = Object.assign({}, item);
-          copy.cat = 'attraction';
-          staticItems.push(copy);
-        });
-        staticItems.forEach(function (item, index) {
-          var angle = index / (staticItems.length || 1) * 2 * Math.PI;
-          var dist = 0.003 + Math.random() * 0.004;
-          var lat = p.lat + Math.sin(angle) * dist;
-          var lon = p.lng + Math.cos(angle) * dist;
-          var category = item.cat || 'attraction';
-          var icon = getPOIIcon(category);
-          var name = item.name || "Địa điểm đề xuất";
-          var poiIcon = L.divIcon({
-            className: 'poi-marker poi-marker-static poi-marker-' + category,
-            html: '<div class="poi-marker-inner">' + icon + '</div>',
-            iconSize: [36, 36],
-            iconAnchor: [18, 18]
-          });
-          var popupContent = '<div class="poi-popup">' + '<span class="poi-popup-category" style="color:#fcd34d">Đề xuất</span>' + '<strong class="poi-popup-title">' + escapeHtml(name) + '</strong>' + '<p style="font-size:0.7rem; margin:4px 0">' + escapeHtml(item.description || "") + '</p>' + '<a href="https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(name + ' ' + (p.region || '')) + '" target="_blank" style="font-size:0.75rem; color:var(--accent); border-top:1px solid rgba(255,255,255,0.1); display:block; padding-top:6px; margin-top:6px; text-decoration:none;">Xem trên Google Maps →</a>' + '</div>';
-          L.marker([lat, lon], {
-            icon: poiIcon
-          }).bindPopup(popupContent).addTo(layers[category] || layers.attraction);
-        });
-      }
-      plotStaticPOIs();
+      wrap.querySelector("[data-modal-add]").addEventListener("click", function () { addStopById(p.id); closeModals(); var pl = document.getElementById("planner"); if (pl) pl.scrollIntoView({ behavior: "smooth" }); });
+      wrap.querySelector("[data-modal-wish]").addEventListener("click", function () {
+        const on = toggleWish(p.id);
+        const wb = wrap.querySelector("[data-modal-wish]");
+        if (on) p.favoritesCount = (p.favoritesCount || 0) + 1; else if (p.favoritesCount > 0) p.favoritesCount -= 1;
+        wb.innerHTML = (on ? '♥ Đã lưu' : '♡ Yêu thích') + (p.favoritesCount > 0 ? ' <span class="wish-count">' + p.favoritesCount + '</span>' : '');
+        fetch('/api/places/' + p.id + '/favorite', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: on ? 'add' : 'remove' }) }).then(function(r){return r.json();}).then(function(j){ if(j.success){ p.favoritesCount=j.favoritesCount; renderDestCards(); renderPersonalSection(); }});
+      });
 
-      // --- THEN FETCH REAL-WORLD DATA IN BACKGROUND ---
-      function syncMarkers(elements) {
-        elements.forEach(function (item) {
-          var lat = item.lat || item.center && item.center.lat;
-          var lon = item.lon || item.center && item.center.lon;
-          if (!lat || !lon) return;
-          var category = getPOICategory(item);
-          var icon = getPOIIcon(category);
-          var name = item.tags.name || "Địa điểm du lịch";
-          var poiIcon = L.divIcon({
-            className: 'poi-marker poi-marker-' + category,
-            html: '<div class="poi-marker-inner">' + icon + '</div>',
-            iconSize: [32, 32],
-            iconAnchor: [16, 16]
-          });
-          var popupContent = '<div class="poi-popup">' + '<span class="poi-popup-category">' + category + '</span>' + '<strong class="poi-popup-title">' + name + '</strong>' + '<a href="https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(name + ' ' + (p.region || '')) + '" target="_blank" style="font-size:0.75rem; color:var(--accent); border-top:1px solid rgba(255,255,255,0.1); display:block; padding-top:6px; margin-top:6px; text-decoration:none;">Xem trên Google Maps →</a>' + '</div>';
-          L.marker([lat, lon], {
-            icon: poiIcon
-          }).bindPopup(popupContent).addTo(layers[category] || layers.attraction);
-        });
-      }
-      var cachedPOIs = window._poiCache[p.id];
-      if (cachedPOIs) {
-        var loadingHint = legend.querySelector('.legend-loading');
-        if (loadingHint) loadingHint.style.display = 'none';
-        syncMarkers(cachedPOIs);
-      } else {
-        try {
-          fetchNearbyPOIs(p.lat, p.lng).then(function (elements) {
-            var loadingHint = legend.querySelector('.legend-loading');
-            if (loadingHint) loadingHint.style.display = 'none';
-            window._poiCache[p.id] = elements;
-            syncMarkers(elements);
-          });
-        } catch (e) {
-          console.error("Overpass POI error:", e);
-          var loadingHint = legend.querySelector('.legend-loading');
-          if (loadingHint) {
-            loadingHint.innerText = "Lỗi khi tải địa điểm.";
-            loadingHint.style.display = 'block';
-          }
+      setTimeout(function () { initPlaceMap(p); }, 200);
+    }).catch(function(err) { wrap.innerHTML = '<p style="padding:2rem; text-align:center;">Lỗi tải dữ liệu.</p>'; });
+  };
+
+  function initPlaceMap(p) {
+    var mapEl = document.getElementById("place-map");
+    if (!mapEl || !p.lat || !p.lng || typeof L === 'undefined') return;
+    
+    if (window._placeMapInstance) {
+      window._placeMapInstance.remove();
+      window._placeMapInstance = null;
+    }
+    window._placeMapInstance = L.map("place-map", { scrollWheelZoom: false }).setView([p.lat, p.lng], 14);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; OpenStreetMap'
+    }).addTo(window._placeMapInstance);
+
+    var layers = {
+      playing: L.layerGroup().addTo(window._placeMapInstance),
+      eating: L.layerGroup().addTo(window._placeMapInstance),
+      sleeping: L.layerGroup().addTo(window._placeMapInstance),
+      attraction: L.layerGroup().addTo(window._placeMapInstance)
+    };
+
+    var legend = document.createElement('div');
+    legend.className = 'map-legend';
+    legend.innerHTML = '<div class="legend-loading">Đang tìm địa điểm xung quanh...</div>' + 
+                       '<div class="legend-item" data-layer="playing"><div class="legend-dot" style="background:#f43f5e"></div> Vui chơi</div>' + 
+                       '<div class="legend-item" data-layer="eating"><div class="legend-dot" style="background:#f59e0b"></div> Ăn uống</div>' + 
+                       '<div class="legend-item" data-layer="sleeping"><div class="legend-dot" style="background:#10b981"></div> Nghỉ ngơi</div>' + 
+                       '<div class="legend-item" data-layer="attraction"><div class="legend-dot" style="background:#0ea5e9"></div> Tham quan</div>';
+    mapEl.appendChild(legend);
+
+    legend.querySelectorAll('.legend-item').forEach(function (item) {
+      item.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var layerName = this.getAttribute('data-layer');
+        var layer = layers[layerName];
+        if (window._placeMapInstance.hasLayer(layer)) {
+          window._placeMapInstance.removeLayer(layer);
+          this.classList.add('is-inactive');
+        } else {
+          window._placeMapInstance.addLayer(layer);
+          this.classList.remove('is-inactive');
         }
-      }
+      });
+    });
 
-      // Định vị người dùng (Geolocation API)
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(function (pos) {
-          var userLat = pos.coords.latitude;
-          var userLng = pos.coords.longitude;
-          var userIcon = L.divIcon({
-            className: 'user-marker-icon',
-            html: "<div style='background-color:#fff; width:14px; height:14px; border-radius:50%; border:3px solid #0ea5e9; box-shadow:0 0 10px rgba(0,0,0,0.5);'></div>",
-            iconSize: [20, 20],
-            iconAnchor: [10, 10]
-          });
-          L.marker([userLat, userLng], {
-            icon: userIcon
-          }).bindPopup('Vị trí của bạn').addTo(window._placeMapInstance);
-        }, function (err) {
-          console.log("Không thể lấy vị trí hiện tại:", err.message);
+    var mainIcon = L.divIcon({
+      className: 'main-dest-marker',
+      html: "<div style='background-color:var(--accent); width:20px; height:20px; border-radius:50%; border:4px solid white; box-shadow:0 0 15px var(--accent);'></div>",
+      iconSize: [24, 24],
+      iconAnchor: [12, 12]
+    });
+    L.marker([p.lat, p.lng], { icon: mainIcon }).bindPopup('<b>' + escapeHtml(p.name) + '</b><br>Tâm điểm du lịch').addTo(window._placeMapInstance);
+
+    // Plot static data (amusement, dining, etc.)
+    var staticItems = [];
+    if (p.amusementPlaces) p.amusementPlaces.forEach(function(i) { staticItems.push(Object.assign({}, i, { cat: 'playing' })); });
+    if (p.accommodations) p.accommodations.forEach(function(i) { staticItems.push(Object.assign({}, i, { cat: 'sleeping' })); });
+    if (p.diningPlaces) p.diningPlaces.forEach(function(i) { staticItems.push(Object.assign({}, i, { cat: 'eating' })); });
+    if (p.checkInSpots) p.checkInSpots.forEach(function(i) { staticItems.push(Object.assign({}, i, { cat: 'attraction' })); });
+
+    staticItems.forEach(function (item, index) {
+      var angle = index / (staticItems.length || 1) * 2 * Math.PI;
+      var dist = 0.003 + Math.random() * 0.004;
+      var lat = p.lat + Math.sin(angle) * dist;
+      var lon = p.lng + Math.cos(angle) * dist;
+      var category = item.cat || 'attraction';
+      var poiIcon = L.divIcon({
+        className: 'poi-marker poi-marker-static poi-marker-' + category,
+        html: '<div class="poi-marker-inner">' + getPOIIcon(category) + '</div>',
+        iconSize: [36, 36], iconAnchor: [18, 18]
+      });
+      var popup = '<div class="poi-popup"><span class="poi-popup-category" style="color:#fcd34d">Đề xuất</span><strong class="poi-popup-title">' + escapeHtml(item.name) + '</strong><p style="font-size:0.7rem; margin:4px 0">' + escapeHtml(item.description || "") + '</p></div>';
+      L.marker([lat, lon], { icon: poiIcon }).bindPopup(popup).addTo(layers[category] || layers.attraction);
+    });
+
+    // Fetch real-world POIs
+    fetchNearbyPOIs(p.lat, p.lng).then(function (elements) {
+      var loadingHint = legend.querySelector('.legend-loading');
+      if (loadingHint) loadingHint.style.display = 'none';
+      elements.forEach(function (item) {
+        var lat = item.lat || (item.center && item.center.lat);
+        var lon = item.lon || (item.center && item.center.lon);
+        if (!lat || !lon) return;
+        var cat = getPOICategory(item);
+        var poiIcon = L.divIcon({
+          className: 'poi-marker poi-marker-' + cat,
+          html: '<div class="poi-marker-inner">' + getPOIIcon(cat) + '</div>',
+          iconSize: [32, 32], iconAnchor: [16, 16]
         });
-      }
-      setTimeout(function () {
-        if (window._placeMapInstance) window._placeMapInstance.invalidateSize();
-      }, 50);
-    }, 350);
+        var popup = '<div class="poi-popup"><span class="poi-popup-category">' + cat + '</span><strong class="poi-popup-title">' + (item.tags.name || "Địa điểm") + '</strong></div>';
+        L.marker([lat, lon], { icon: poiIcon }).bindPopup(popup).addTo(layers[cat] || layers.attraction);
+      });
+    }).catch(function() {
+      var loadingHint = legend.querySelector('.legend-loading');
+      if (loadingHint) loadingHint.innerText = "Không thể tải thêm địa điểm.";
+    });
+
+    // Geolocation
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(function (pos) {
+        var userIcon = L.divIcon({
+          className: 'user-marker-icon',
+          html: "<div style='background-color:#fff; width:14px; height:14px; border-radius:50%; border:3px solid #0ea5e9; box-shadow:0 0 10px rgba(0,0,0,0.5);'></div>",
+          iconSize: [20, 20], iconAnchor: [10, 10]
+        });
+        L.marker([pos.coords.latitude, pos.coords.longitude], { icon: userIcon }).bindPopup('Vị trí của bạn').addTo(window._placeMapInstance);
+      });
+    }
+
+    setTimeout(function () {
+      if (window._placeMapInstance) window._placeMapInstance.invalidateSize();
+    }, 200);
   }
   function renderPersonalSection() {
     var sec = document.querySelector("[data-personal-section]");
@@ -2287,325 +2246,39 @@
       var payload = {
         name: fd.get("name") || "",
         email: fd.get("email") || "",
-        message: fd.get("message") || "" // changed from "note"
+        message: fd.get("message") || ""
       };
       fetch('/api/feedback', {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
-      }).then(function (res) {
-        return res.json();
-      }).then(function (json) {
+      }).then(function (res) { return res.json(); })
+      .then(function (json) {
         if (json.success) {
-          statusEl.textContent = "✔ Đã bắt được yêu cầu! Cảm ơn bạn.";
+          statusEl.textContent = "✔ Đã gửi yêu cầu! Cảm ơn bạn.";
           statusEl.classList.add("is-success");
           form.reset();
           updateContactPrefill();
-          // Track quest activity: Liên hệ & Đánh giá
-          try {
-            var qa = JSON.parse(localStorage.getItem('wv_quest_activity') || '{}');
-            qa.expContact = 1;
-            qa.reviewWrite = (qa.reviewWrite || 0) + 1;
-            localStorage.setItem('wv_quest_activity', JSON.stringify(qa));
-          } catch(e) {}
         } else {
-          statusEl.textContent = "✖ Lỗi: " + (json.message || "Không thể gửi phản hồi.");
+          statusEl.textContent = "✖ Lỗi: " + (json.message || "Không thể gửi.");
           statusEl.classList.add("is-error");
         }
-      }).catch(function (err) {
-        statusEl.textContent = "✖ Lỗi kết nối máy chủ. Vui lòng thử lại sau.";
+      }).catch(function () {
+        statusEl.textContent = "✖ Lỗi kết nối máy chủ.";
         statusEl.classList.add("is-error");
-      }).finally(function () {
-        window.setTimeout(function () {
-          if (statusEl.classList.contains("is-success")) {
-            statusEl.textContent = "";
-          }
-        }, 3500);
       });
     });
   }
 
-  /* ——— Chatbot (Hỗ trợ Đa phiên & Lịch sử) ——— */
-  var currentSessionId = null;
-  var chatPanel = document.querySelector("[data-chat-panel]");
-  var chatToggleBtns = document.querySelectorAll("[data-chat-toggle]");
-  var chatLog = document.querySelector("[data-chat-log]");
-  var chatForm = document.querySelector("[data-chat-form]");
-  var chatInput = document.querySelector("[data-chat-input]");
-  
-  // History Sidebar Elements
-  var historyView = document.querySelector("[data-chat-sessions-view]");
-  var historyList = document.querySelector("[data-chat-sessions-list]");
-  var historyToggleBtn = document.querySelector("[data-chat-history-btn]");
-  var historyCloseBtn = document.querySelector("[data-chat-history-close]");
-  var newChatBtn = document.querySelector("[data-chat-new-btn]");
+  /* ——— Chatbot managed by SharedUI.js ——— */
 
-  function botReply(userText) {
-    if (typeof window.wanderChatReply === "function") {
-      return window.wanderChatReply(userText, {
-        places: PLACES,
-        getPrefs: getPrefs,
-        userPos: userPos || null,
-        itinerary: stopList || [],
-        sessionId: currentSessionId,
-        lang: localStorage.getItem('wander_chat_lang') || 'auto'
-      });
-    }
-    return Promise.resolve({ success: false, answer: "Trợ lý kết nối máy chủ đang bị gián đoạn." });
-  }
 
-  function appendChat(kind, text) {
-    if (!chatLog) return;
-    var b = document.createElement("div");
-    b.className = "chat-bubble chat-bubble--" + (kind === "user" ? "user" : "bot");
-    b.textContent = text;
-    chatLog.appendChild(b);
-    chatLog.scrollTop = chatLog.scrollHeight;
-  }
+  /* Chatbot handled by SharedUI.js */
 
-  function loadChatHistory(sid) {
-    var token = localStorage.getItem('wander_token') || localStorage.getItem('wander_admin_token');
-    chatLog.innerHTML = '<div style="text-align:center;padding:1rem;font-size:0.8rem;color:var(--text-muted);">Đang tải hội thoại...</div>';
-    currentSessionId = sid;
-    
-    if (historyView) {
-      historyView.classList.remove('is-active');
-      setTimeout(function() { historyView.hidden = true; }, 300);
-    }
 
-    fetch("/api/chat/history/" + sid, {
-      headers: { 'x-auth-token': token }
-    })
-    .then(function(r) { return r.json(); })
-    .then(function(json) {
-      chatLog.innerHTML = '';
-      if (json.success && json.messages) {
-        json.messages.forEach(function(m) {
-          appendChat(m.role === 'user' ? 'user' : 'bot', m.text);
-        });
-      } else {
-        appendChat('bot', 'Không thể tải lịch sử đoạn chat này.');
-      }
-    })
-    .catch(function() {
-      chatLog.innerHTML = '';
-      appendChat('bot', 'Lỗi kết nối khi tải lịch sử.');
-    });
-  }
 
-  function loadChatSessions() {
-    var token = localStorage.getItem('wander_token') || localStorage.getItem('wander_admin_token');
-    if (!token) {
-      if (historyList) historyList.innerHTML = '<div class="chat-sessions-loading">Vui lòng đăng nhập để xem lịch sử.</div>';
-      return;
-    }
-    if (historyList) historyList.innerHTML = '<div class="chat-sessions-loading">Đang tải...</div>';
-    
-    fetch("/api/chat/sessions", {
-      headers: { 'x-auth-token': token }
-    })
-    .then(function(r) { return r.json(); })
-    .then(function(json) {
-      if (json.success && json.sessions && json.sessions.length > 0) {
-        historyList.innerHTML = '';
-        json.sessions.forEach(function(s) {
-          var item = document.createElement('div');
-          item.className = 'chat-session-item';
-          var dateStr = new Date(s.updatedAt).toLocaleDateString('vi-VN', { hour: '2-digit', minute: '2-digit' });
-          item.innerHTML = '<div class="chat-session-item__info">' +
-                             '<div class="chat-session-item__title">' + escapeHtml(s.title || 'Hội thoại du lịch') + '</div>' +
-                             '<div class="chat-session-item__date">' + dateStr + '</div>' +
-                           '</div>' +
-                           '<button type="button" class="btn-delete-session" title="Xóa">🗑️</button>';
-          
-          item.onclick = function() { loadChatHistory(s.sessionId); };
-          
-          var delBtn = item.querySelector('.btn-delete-session');
-          delBtn.onclick = function(e) {
-            e.stopPropagation();
-            if (confirm('Xóa vĩnh viễn đoạn hội thoại này?')) {
-              fetch('/api/chat/session/' + s.sessionId, {
-                method: 'DELETE',
-                headers: { 'x-auth-token': token }
-              })
-              .then(function(r) { return r.json(); })
-              .then(function(res) {
-                if (res.success) {
-                  item.remove();
-                  if (currentSessionId === s.sessionId) {
-                    currentSessionId = null;
-                    chatLog.innerHTML = '';
-                    appendChat('bot', 'Hội thoại đã bị xóa.');
-                  }
-                }
-              });
-            }
-          };
 
-          historyList.appendChild(item);
-        });
-      } else {
-        historyList.innerHTML = '<div class="chat-sessions-loading">Chưa có hội thoại nào.</div>';
-      }
-    })
-    .catch(function() {
-      if (historyList) historyList.innerHTML = '<div class="chat-sessions-loading">Lỗi tải lịch sử.</div>';
-    });
-  }
 
-  if (historyToggleBtn) {
-    historyToggleBtn.onclick = function() {
-      if (historyView) {
-        historyView.hidden = false;
-        setTimeout(function() { historyView.classList.add('is-active'); }, 10);
-        loadChatSessions();
-      }
-    };
-    // Đóng khi click vào vùng trống (background)
-    if (historyView) {
-      historyView.onclick = function(e) {
-        if (e.target === historyView) {
-          historyView.classList.remove('is-active');
-          setTimeout(function() { historyView.hidden = true; }, 300);
-        }
-      };
-    }
-  }
-  if (historyCloseBtn) {
-    historyCloseBtn.onclick = function() {
-      if (historyView) {
-        historyView.classList.remove('is-active');
-        setTimeout(function() { historyView.hidden = true; }, 300);
-      }
-    };
-  }
-
-  // --- Language Switcher Logic (Improved for multiple instances) ---
-  function initLangSwitchers() {
-    var switchers = document.querySelectorAll('.chat-lang-switcher');
-    var savedLang = localStorage.getItem('wander_chat_lang') || 'auto';
-    
-    switchers.forEach(function(switcher) {
-      var btn = switcher.querySelector('.chat-lang-btn');
-      var dropdown = switcher.querySelector('.chat-lang-dropdown');
-      var codeSpan = switcher.querySelector('.current-lang-code');
-
-      if (codeSpan) codeSpan.textContent = savedLang.toUpperCase();
-
-      if (btn && dropdown) {
-        btn.onclick = function(e) {
-          e.stopPropagation();
-          // Đóng các dropdown khác trước
-          document.querySelectorAll('.chat-lang-dropdown').forEach(function(d) {
-            if (d !== dropdown) d.classList.remove('is-active');
-          });
-          dropdown.classList.toggle('is-active');
-        };
-
-        dropdown.querySelectorAll('button').forEach(function(lBtn) {
-          lBtn.onclick = function() {
-            var lang = this.getAttribute('data-lang');
-            localStorage.setItem('wander_chat_lang', lang);
-            
-            // Cập nhật tất cả các code span trên trang
-            document.querySelectorAll('.current-lang-code').forEach(function(span) {
-              span.textContent = lang.toUpperCase();
-            });
-            
-            // Cập nhật Placeholder
-            var placeholders = {
-              'auto': 'Hỏi về du lịch Việt Nam…',
-              'vi': 'Hỏi về du lịch Việt Nam…',
-              'en': 'Ask about Vietnam tourism…',
-              'jp': 'ベトナム観光について聞く…',
-              'kr': '베트남 관광에 대해 hỏi…',
-              'fr': 'Posez des questions sur le tourisme au Vietnam…'
-            };
-            if (chatInput) chatInput.placeholder = placeholders[lang] || placeholders['vi'];
-
-            dropdown.classList.remove('is-active');
-            
-            var confirmMsg = {
-              'auto': 'Đã chuyển sang tự nhận diện ngôn ngữ.',
-              'vi': 'Đã chuyển sang Tiếng Việt.',
-              'en': 'Switched to English.',
-              'jp': '日本語に切り替えました。',
-              'kr': '한국어로 전환되었습니다.',
-              'fr': 'Passé en français.'
-            };
-            appendChat('bot', confirmMsg[lang] || confirmMsg['vi']);
-          };
-        });
-      }
-    });
-
-    document.addEventListener('click', function() {
-      document.querySelectorAll('.chat-lang-dropdown').forEach(function(d) {
-        d.classList.remove('is-active');
-      });
-    });
-  }
-  
-  initLangSwitchers();
-
-  if (newChatBtn) {
-    newChatBtn.onclick = function() {
-        currentSessionId = null;
-        chatLog.innerHTML = '';
-        appendChat('bot', 'Chào bạn! Tôi đã sẵn sàng cho cuộc trò chuyện mới. Mình có thể giúp gì cho chuyến đi của bạn?');
-    };
-  }
-
-  function setChatOpen(open) {
-    if (!chatPanel) return;
-    chatPanel.hidden = !open;
-    chatToggleBtns.forEach(function (btn) {
-      btn.setAttribute("aria-expanded", open ? "true" : "false");
-    });
-    if (open && chatInput) chatInput.focus();
-  }
-  
-  chatToggleBtns.forEach(function (btn) {
-    btn.addEventListener("click", function (e) {
-      e.stopPropagation();
-      setChatOpen(chatPanel.hidden);
-    });
-  });
-
-  if (chatForm && chatInput) {
-    chatForm.addEventListener("submit", function (e) {
-      e.preventDefault();
-      var msg = chatInput.value.trim();
-      if (!msg) return;
-      appendChat("user", msg);
-      chatInput.value = "";
-
-      // Track quest activity: Trò chuyện với AI
-      try {
-        var qa = JSON.parse(localStorage.getItem('wv_quest_activity') || '{}');
-        qa.dailyChat = 1;
-        localStorage.setItem('wv_quest_activity', JSON.stringify(qa));
-      } catch(e) {}
-
-      var tempBubble = document.createElement("div");
-      tempBubble.className = "chat-bubble chat-bubble--bot";
-      tempBubble.textContent = "AI đang suy nghĩ...";
-      chatLog.appendChild(tempBubble);
-      chatLog.scrollTop = chatLog.scrollHeight;
-
-      botReply(msg).then(function (data) {
-        chatLog.removeChild(tempBubble);
-        if (data.success) {
-          appendChat("bot", data.answer);
-          if (data.sessionId) currentSessionId = data.sessionId;
-        } else {
-          appendChat("bot", data.answer || "Trợ lý đang bận...");
-        }
-      });
-    });
-  }
 
   /* ——— Ticker Tự Động (Destinations) ——— */
   function initDestinationsTicker() {
@@ -2817,6 +2490,77 @@
     };
   }
 
+  function initHeroSlideshow() {
+    var container = document.getElementById('heroSlideshow');
+    if (!container) return;
+
+    // Reduced resolution to 1200px for faster loading
+    var images = [
+      'https://images.unsplash.com/photo-1528127269322-539801943592?q=80&w=1200', // Hoi An
+      'https://images.unsplash.com/photo-1524231757912-21f4fe3a7200?q=80&w=1200', // Ha Long
+      'https://images.unsplash.com/photo-1509030450996-dd1a26dda07a?q=80&w=1200', // Sapa
+      'https://images.unsplash.com/photo-1559592442-7e182c9403db?q=80&w=1200', // Golden Bridge
+      'https://images.unsplash.com/photo-1589785834230-fb760205273d?q=80&w=1200', // Phu Quoc
+      'https://images.unsplash.com/photo-1563270412-2976f9d3b733?q=80&w=1200', // Hue
+      'https://images.unsplash.com/photo-1506462945848-ac8ea6f609cc?q=80&w=1200', // Mui Ne
+      'https://images.unsplash.com/photo-1596422846543-75c6fc197f07?q=80&w=1200', // Ninh Binh
+      'https://images.unsplash.com/photo-1582234372722-50d7ccc30ebd?q=80&w=1200', // Ha Giang
+      'https://images.unsplash.com/photo-1555944858-752c8a522644?q=80&w=1200'  // Saigon Skyline
+    ];
+
+    var currentIndex = 0;
+    var zIndexCounter = 10;
+    
+    // Safety Net: Set container background to first image immediately
+    container.style.backgroundImage = 'url(' + images[0] + ')';
+    container.style.backgroundSize = 'cover';
+    container.style.backgroundPosition = 'center';
+
+    function createSlide(url, active) {
+      var slide = document.createElement('div');
+      slide.className = 'hero-v2__slide';
+      slide.style.backgroundImage = 'url(' + url + ')';
+      if (active) {
+        slide.classList.add('is-active');
+        slide.style.zIndex = zIndexCounter;
+      }
+      container.appendChild(slide);
+      return slide;
+    }
+
+    var currentSlide = createSlide(images[0], true);
+
+    function next() {
+      var nextIndex = (currentIndex + 1) % images.length;
+      var nextUrl = images[nextIndex];
+      
+      // Step 1: Create the next slide (it will start hidden and start loading)
+      zIndexCounter++;
+      var nextSlide = createSlide(nextUrl, false);
+      nextSlide.style.zIndex = zIndexCounter;
+      
+      // Step 2: Trigger fade in after a tiny delay to ensure DOM insertion
+      requestAnimationFrame(function() {
+        nextSlide.classList.add('is-active');
+      });
+
+      // Step 3: Keep the old slide for a while, then clean up
+      var oldSlide = currentSlide;
+      setTimeout(function() {
+        container.style.backgroundImage = 'url(' + nextUrl + ')';
+        if (oldSlide && oldSlide.parentNode) {
+          oldSlide.parentNode.removeChild(oldSlide);
+        }
+      }, 2000); 
+
+      currentSlide = nextSlide;
+      currentIndex = nextIndex;
+    }
+
+    // Faster rotation: Every 4 seconds
+    setInterval(next, 4000);
+  }
+
   /* ——— Boot ——— */
   function init() {
     // 0. Kiểm tra thông báo redirect từ Route Guard (vd: bị đá ra từ business.html)
@@ -2908,6 +2652,7 @@
       if (tripNameInput && draft && draft.name) tripNameInput.value = draft.name;
       renderStopListUI();
       initSearchSuggestions();
+      initHeroSlideshow();
       // --- Hero Tags ---
       document.querySelectorAll('.glass-chip').forEach(function (chip) {
         chip.onclick = function () {
@@ -2947,90 +2692,97 @@
     // Refresh UI immediately so user sees profile instead of "Tham gia" right away
     refreshAuthUI();
 
-    loadPlacesFromAPI().then(function () {
-      if (typeof initNotificationPolling === 'function') initNotificationPolling();
-      window.requestAnimationFrame(function () {
-        redrawMap();
-      });
-      var rankedInit = sortByScore(getPrefs());
-      renderSmartResults(rankedInit);
-      refreshAuthUI();
-      if (profileForm && getSession() && token) {
-        fetch('/api/auth/user/me', { headers: { 'x-auth-token': token } })
-          .then(function(r) { return r.json(); })
-          .then(function(d) {
-            if (d.success && d.user) {
-              var u = d.user;
-              if (profileForm.elements.displayName) profileForm.elements.displayName.value = u.displayName || u.name || "";
-              if (profileForm.elements.notes) profileForm.elements.notes.value = u.notes || "";
-              if (profileForm.elements.phone) profileForm.elements.phone.value = u.phone || "";
-            }
-          }).catch(function(){});
-      }
-
-      // -- Kết nối VoiceGuide với Chatbot --
-      if (window.voiceGuide) {
-        // Nút Mic Trợ lý (Expert Mode) trong khung Chat
-        var companionBtn = document.getElementById('companion-toggle');
-        if (companionBtn) {
-          companionBtn.addEventListener('click', function (e) {
-            e.preventDefault();
-            if (!window.voiceGuide.recognition) {
-              if (window.SharedUI && window.SharedUI.showToast) {
-                window.SharedUI.showToast("Trình duyệt không hỗ trợ Mic hoặc chưa cấp quyền.", "error");
-              } else {
-                alert("Trình duyệt không hỗ trợ Mic.");
-              }
-              return;
-            }
-            var active = this.classList.toggle('is-active');
-            window.voiceGuide.setCompanionMode(active);
-          });
-        }
-        window.voiceGuide.onStatusChange = function (status) {
-          // Đồng bộ trạng thái visual của nút Mic
-          if (companionBtn) {
-            companionBtn.classList.toggle('is-listening', status === 'listening');
-          }
-        };
-        window.voiceGuide.onResultCallback = function (text) {
-          if (!text) return;
-          setChatOpen(true);
-          appendChat("user", text);
-
-          // Hiệu ứng "đang suy nghĩ"
-          var tempBubble = document.createElement("div");
-          tempBubble.className = "chat-bubble chat-bubble--bot";
-          tempBubble.textContent = "AI đang suy nghĩ...";
-          chatLog.appendChild(tempBubble);
-          chatLog.scrollTop = chatLog.scrollHeight;
-          botReply(text).then(function (reply) {
-            if (tempBubble && tempBubble.parentNode) chatLog.removeChild(tempBubble);
-            appendChat("bot", reply);
-
-            // Phát âm thanh trả lời
-            window.voiceGuide.speak(reply);
-          });
-        };
-      }
+    if (typeof initNotificationPolling === 'function') initNotificationPolling();
+    window.requestAnimationFrame(function () {
+      redrawMap();
     });
+    var rankedInit = sortByScore(getPrefs());
+    renderSmartResults(rankedInit);
+    refreshAuthUI();
+    if (profileForm && getSession() && token) {
+      fetch('/api/auth/user/me', { headers: { 'x-auth-token': token } })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          if (d.success && d.user) {
+            var u = d.user;
+            if (profileForm.elements.displayName) profileForm.elements.displayName.value = u.displayName || u.name || "";
+            if (profileForm.elements.notes) profileForm.elements.notes.value = u.notes || "";
+            if (profileForm.elements.phone) profileForm.elements.phone.value = u.phone || "";
+          }
+        }).catch(function(){});
+    }
+
+    // -- Kết nối VoiceGuide với Chatbot --
+    if (window.voiceGuide) {
+      // Nút Mic Trợ lý (Expert Mode) trong khung Chat
+      var companionBtn = document.getElementById('companion-toggle');
+      if (companionBtn) {
+        companionBtn.addEventListener('click', function (e) {
+          e.preventDefault();
+          if (!window.voiceGuide.recognition) {
+            if (window.SharedUI && window.SharedUI.showToast) {
+              window.SharedUI.showToast("Trình duyệt không hỗ trợ Mic hoặc chưa cấp quyền.", "error");
+            } else {
+              alert("Trình duyệt không hỗ trợ Mic.");
+            }
+            return;
+          }
+          var active = this.classList.toggle('is-active');
+          window.voiceGuide.setCompanionMode(active);
+        });
+      }
+      window.voiceGuide.onStatusChange = function (status) {
+        // Đồng bộ trạng thái visual của nút Mic
+        if (companionBtn) {
+          companionBtn.classList.toggle('is-listening', status === 'listening');
+        }
+      };
+      window.voiceGuide.onResultCallback = function (text) {
+        if (!text) return;
+        setChatOpen(true);
+        appendChat("user", text);
+
+        // Hiệu ứng "đang suy nghĩ"
+        var tempBubble = document.createElement("div");
+        tempBubble.className = "chat-bubble chat-bubble--bot";
+        tempBubble.textContent = "AI đang suy nghĩ...";
+        chatLog.appendChild(tempBubble);
+        chatLog.scrollTop = chatLog.scrollHeight;
+        botReply(text).then(function (reply) {
+          if (tempBubble && tempBubble.parentNode) chatLog.removeChild(tempBubble);
+          appendChat("bot", reply);
+
+          // Phát âm thanh trả lời
+          window.voiceGuide.speak(reply);
+        });
+      };
+    }
   }
   init().then(function () {
     startup();
     loadPublicStats();
     loadPublicReviews();
+    
+    // Auto-open settings or place modal if requested via URL
+    var urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('openSettings') === 'true') {
+      setTimeout(function () {
+        var sess = getSession();
+        if (sess && sess.email && openSettingsBtn) {
+          openSettingsBtn.click();
+        }
+      }, 500);
+    }
+    
+    var autoPlaceId = urlParams.get('place');
+    if (autoPlaceId) {
+      setTimeout(function() {
+        if (typeof window.openPlaceModal === 'function') {
+          window.openPlaceModal(autoPlaceId);
+        }
+      }, 500);
+    }
   });
-
-  // Auto-open settings if requested via URL
-  var urlParams = new URLSearchParams(window.location.search);
-  if (urlParams.get('openSettings') === 'true') {
-    setTimeout(function () {
-      var sess = getSession();
-      if (sess && sess.email && openSettingsBtn) {
-        openSettingsBtn.click();
-      }
-    }, 500);
-  }
 
   // Handle Hash Actions (for Quests redirection)
   function handleHashActions() {
@@ -3062,3 +2814,4 @@
   window.addEventListener('hashchange', handleHashActions);
   setTimeout(handleHashActions, 1000); // Initial check
 })();
+

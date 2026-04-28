@@ -23,4 +23,6 @@ const itinerarySchema = new mongoose.Schema({
   createdAt: { type: Date, default: Date.now }
 });
 
+itinerarySchema.index({ userId: 1, createdAt: -1 });
+
 module.exports = plannerDb.model('Itinerary', itinerarySchema);

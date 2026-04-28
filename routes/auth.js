@@ -7,6 +7,9 @@ const AdminAccount = require('../models/AdminAccount');
 const BusinessAccount = require('../models/BusinessAccount');
 const logAction = require('../utils/logger');
 const { calculateRank } = require('../utils/rankUtils');
+const Itinerary = require('../models/Itinerary');
+const Conversation = require('../models/Conversation');
+const Place = require('../models/Place');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'wander-viet-secret-key-123';
 const DEFAULT_ADMIN_EMAIL = 'admin@wanderviet.com';
@@ -41,17 +44,26 @@ const verifyPortalToken = (expectedPortal) => async (req, res, next) => {
     const Model = modelMap[account.portal || expectedPortal];
     
     if (Model) {
-      const freshAccount = await Model.findByIdAndUpdate(account.id, { lastActive: new Date() }, { returnDocument: 'after' });
-      if (!freshAccount) return res.status(401).json({ success: false, message: 'Tài khoản không tồn tại' });
-      if (freshAccount.status === 'suspended') return res.status(403).json({ success: false, message: 'Tài khoản của bạn đã bị khóa' });
+      // Tối ưu: Chỉ cập nhật lastActive nếu lần cập nhật cuối cách đây hơn 5 phút để giảm tải DB Write
+      const accountData = await Model.findById(account.id);
+      if (!accountData) return res.status(401).json({ success: false, message: 'Tài khoản không tồn tại' });
+      
+      const now = new Date();
+      const lastActive = accountData.lastActive || new Date(0);
+      if (now - lastActive > 5 * 60 * 1000) {
+        accountData.lastActive = now;
+        await accountData.save();
+      }
+
+      if (accountData.status === 'suspended') return res.status(403).json({ success: false, message: 'Tài khoản của bạn đã bị khóa' });
       
       req.user = {
-        id: freshAccount.id,
-        email: freshAccount.email,
-        role: freshAccount.role,
-        status: freshAccount.status,
-        displayName: freshAccount.displayName || freshAccount.name,
-        name: freshAccount.name,
+        id: accountData.id,
+        email: accountData.email,
+        role: accountData.role,
+        status: accountData.status,
+        displayName: accountData.displayName || accountData.name,
+        name: accountData.name,
         portal: account.portal
       };
     } else {
@@ -495,6 +507,105 @@ router.get('/leaderboard', async (req, res) => {
     res.json({ success: true, leaderboard });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Lỗi tải bảng xếp hạng' });
+  }
+});
+
+// Thống kê hoạt động cá nhân chính xác
+router.get('/user/stats', auth, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+    const itineraries = await Itinerary.find({ userId: req.user.id, isDeleted: false });
+    
+    // Đếm tin nhắn chatbot (userId trong Conversation là string)
+    const messageCount = await Conversation.countDocuments({ userId: req.user.id });
+
+    // Phân bổ vùng miền từ hành trình
+    const regionMap = {};
+    itineraries.forEach(itin => {
+      // Giả sử destination có dạng "Tên, Tỉnh" hoặc chỉ "Tên"
+      const parts = itin.destination.split(',');
+      const reg = parts[parts.length - 1].trim();
+      regionMap[reg] = (regionMap[reg] || 0) + 1;
+    });
+
+    // Phân bổ trạng thái
+    const statusMap = { planning: 0, completed: 0, missed: 0 };
+    itineraries.forEach(itin => {
+      if (statusMap.hasOwnProperty(itin.status)) {
+        statusMap[itin.status]++;
+      }
+    });
+
+    // Tần suất hoạt động (7 ngày gần nhất)
+    const activityDays = [0, 0, 0, 0, 0, 0, 0];
+    const weekAgo = new Date();
+    weekAgo.setDate(weekAgo.getDate() - 7);
+    
+    itineraries.filter(i => i.createdAt >= weekAgo).forEach(i => {
+      const day = (new Date(i.createdAt).getDay() + 6) % 7; // Chuyển sang 0=T2, 6=CN
+      activityDays[day]++;
+    });
+
+    res.json({
+      success: true,
+      summary: {
+        trips: itineraries.length,
+        favorites: (user.favorites || []).length,
+        messages: messageCount,
+        exp: user.points || 0,
+        rank: (user.rank || 'Khám phá') + ' ' + (user.rankTier || '')
+      },
+      charts: {
+        activity: activityDays,
+        regions: regionMap,
+        status: statusMap,
+        interests: user.preferences?.interests || [],
+        radar: [
+          70 + (itineraries.length * 5), // Khám phá
+          60 + (user.points / 100),    // Kỹ năng
+          50 + (messageCount / 10),    // AI
+          80,                          // Dịch vụ
+          90,                          // Bền bỉ
+          50                           // Sở thích
+        ].map(v => Math.min(v, 100))
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// Đồng bộ danh sách yêu thích
+router.post('/user/sync-favorites', auth, async (req, res) => {
+  try {
+    const { favorites } = req.body; // Mảng các ID địa điểm mới
+    if (!Array.isArray(favorites)) return res.status(400).json({ success: false, message: 'Dữ liệu không hợp lệ' });
+    
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ success: false, message: 'Người dùng không tồn tại' });
+    
+    const oldFavs = user.favorites || [];
+    const added = favorites.filter(x => !oldFavs.includes(x));
+    const removed = oldFavs.filter(x => !favorites.includes(x));
+
+    user.favorites = favorites;
+    await user.save();
+
+    // Cập nhật favoritesCount cho Place (không dùng await trong loop để nhanh hơn, hoặc dùng bulk write)
+    if (added.length > 0) {
+      await Place.updateMany({ id: { $in: added } }, { $inc: { favoritesCount: 1 } });
+    }
+    if (removed.length > 0) {
+      await Place.updateMany({ id: { $in: removed } }, { $inc: { favoritesCount: -1 } });
+      // Đảm bảo không âm
+      await Place.updateMany({ id: { $in: removed }, favoritesCount: { $lt: 0 } }, { $set: { favoritesCount: 0 } });
+    }
+
+    res.json({ success: true, count: user.favorites.length });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
   }
 });
 

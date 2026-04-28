@@ -17,9 +17,9 @@ router.get('/stats', async (req, res) => {
     res.json({
       success: true,
       data: {
-        userCount: userCount + 1500, // Thêm số ảo cho hoành tráng
+        userCount: userCount,
         placeCount: placeCount,
-        feedbackCount: feedbackCount + 800 // Thêm số ảo
+        feedbackCount: feedbackCount
       }
     });
   } catch (err) {

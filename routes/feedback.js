@@ -3,6 +3,19 @@ const router = express.Router();
 const nodemailer = require('nodemailer');
 const Feedback = require('../models/Feedback');
 
+const { auth } = require('./auth');
+
+// GET /api/feedback/my-feedbacks (Get user's own feedback history)
+router.get('/my-feedbacks', auth, async (req, res) => {
+  try {
+    const email = req.user.email;
+    const feedbacks = await Feedback.find({ email: email }).sort({ createdAt: -1 });
+    res.json({ success: true, data: feedbacks });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Lỗi server khi lấy lịch sử phản hồi' });
+  }
+});
+
 // POST /api/feedback (Public endpoint for users to submit feedback)
 router.post('/', async (req, res) => {
   try {

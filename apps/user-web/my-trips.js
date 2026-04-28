@@ -119,8 +119,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Add events
     card.querySelector('.btn-view').onclick = () => {
-      sessionStorage.setItem('wander_view_trip', jsonStr);
-      window.location.href = 'planner.html?view=true';
+      if (window.WanderUI && WanderUI.openItineraryDetail) {
+        WanderUI.openItineraryDetail(it._id, it);
+      } else {
+        window.location.href = 'planner.html?itin=' + it._id;
+      }
     };
     const goBtn = card.querySelector('.btn-go');
     if (goBtn) goBtn.onclick = () => {
