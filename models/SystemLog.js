@@ -12,4 +12,9 @@ const systemLogSchema = new mongoose.Schema({
   timestamp: { type: Date, default: Date.now }
 });
 
+// Thêm Indexes để chống nghẽn cổ chai (High Latency) khi truy vấn sort & filter
+systemLogSchema.index({ timestamp: -1 });
+systemLogSchema.index({ userName: 1, timestamp: -1 });
+systemLogSchema.index({ action: 1 });
+
 module.exports = mongoose.model('SystemLog', systemLogSchema);

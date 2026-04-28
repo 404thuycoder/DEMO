@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const Notification = require('../models/Notification');
+const Broadcast = require('../models/Broadcast');
 const { auth, sharedAuth } = require('./auth');
 const User = require('../models/User');
 
@@ -81,17 +82,67 @@ router.post('/broadcast', sharedAuth, roleAuth(['admin', 'superadmin']), async (
         finalRecipient = `ROLE_${recipientType}`;
     }
 
-    const notification = new Notification({
-      recipientId: finalRecipient,
-      senderId: req.user.id,
+    const { isScheduled, scheduledTime } = req.body;
+
+    if (!isScheduled) {
+        const notification = new Notification({
+            recipientId: finalRecipient,
+            senderId: req.user.id,
+            title,
+            message,
+            link,
+            type: type || 'broadcast'
+        });
+        await notification.save();
+    }
+
+    // Always save to Broadcast model for Admin history tracking
+    const broadcastRecord = new Broadcast({
       title,
       message,
-      link,
-      type: type || 'broadcast'
+      type: type || 'broadcast',
+      recipientType,
+      targetId: finalRecipient,
+      senderId: req.user.id,
+      senderName: req.user.displayName || req.user.name,
+      isScheduled: !!isScheduled,
+      scheduledTime: isScheduled ? new Date(scheduledTime) : null,
+      status: isScheduled ? 'pending' : 'sent'
     });
+    await broadcastRecord.save();
 
-    await notification.save();
-    res.json({ success: true, data: notification });
+    res.json({ success: true, data: broadcastRecord, message: isScheduled ? 'Đã lập lịch gửi thông báo thành công' : 'Đã gửi thông báo thành công' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// DELETE /api/notifications/history/:id - Cancel/Delete scheduled broadcast
+router.delete('/history/:id', sharedAuth, roleAuth(['admin', 'superadmin']), async (req, res) => {
+  try {
+    const broadcast = await Broadcast.findById(req.params.id);
+    if (!broadcast) return res.status(404).json({ success: false, message: 'Không tìm thấy' });
+    
+    // Only allow deleting/cancelling if it's still pending
+    if (broadcast.status === 'pending') {
+        broadcast.status = 'cancelled';
+        await broadcast.save();
+        return res.json({ success: true, message: 'Đã hủy lịch gửi thông báo' });
+    }
+    
+    // If it's already sent, we just remove it from history (optional, or just delete)
+    await Broadcast.findByIdAndDelete(req.params.id);
+    res.json({ success: true, message: 'Đã xóa bản ghi' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// GET /api/notifications/history - Admin view broadcast history
+router.get('/history', sharedAuth, roleAuth(['admin', 'superadmin']), async (req, res) => {
+  try {
+    const history = await Broadcast.find().sort({ createdAt: -1 }).limit(50);
+    res.json({ success: true, data: history });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Server error' });
   }

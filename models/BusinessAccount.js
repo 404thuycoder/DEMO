@@ -10,7 +10,9 @@ const businessAccountSchema = new mongoose.Schema({
   status: { type: String, enum: ['active', 'pending', 'suspended'], default: 'active' },
   lastActive: { type: Date, default: Date.now },
   createdAt: { type: Date, default: Date.now },
-  points: { type: Number, default: 0 }
+  points: { type: Number, default: 0 },
+  resetPasswordToken: String,
+  resetPasswordExpires: Date
 });
 
 module.exports = mongoose.model('BusinessAccount', businessAccountSchema);

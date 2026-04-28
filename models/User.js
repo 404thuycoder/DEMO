@@ -44,6 +44,8 @@ const userSchema = new mongoose.Schema({
   rank: { type: String, default: 'Đồng' },
   rankTier: { type: String, default: 'I' },
   claimedQuests: [String],
+  resetPasswordToken: String,
+  resetPasswordExpires: Date,
   createdAt: { type: Date, default: Date.now }
 });
 
