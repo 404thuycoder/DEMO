@@ -17,7 +17,7 @@ const itinerarySchema = new mongoose.Schema({
   },
   isDeleted: { type: Boolean, default: false },
   // Nếu hệ thống đang login thì lưu ID user, nếu khách vãng lai thì để trống
-  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  userId: { type: String, default: null },
   userName: { type: String, default: 'Khách vãng lai' }, // ♥ Tên hiển thị trong DB
   userEmail: { type: String, default: '' },              // ♥ Email hiển thị trong DB
   createdAt: { type: Date, default: Date.now }

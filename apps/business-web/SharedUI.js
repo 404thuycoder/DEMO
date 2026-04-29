@@ -8,7 +8,7 @@ function _asyncToGenerator(n) { return function () { var t = this, e = arguments
  * WanderViệt Shared UI Logic
  * Handles Theme, Settings Drawer, and Toast system across all portals.
  */
-window.WanderUI = function () {
+window.WanderUI = Object.assign(window.WanderUI || {}, function () {
   'use strict';
 
   var STORAGE_THEME = 'wander_theme';
@@ -293,7 +293,7 @@ window.WanderUI = function () {
     markAsRead: markAsRead,
     trackQuestActivity: trackQuestActivity
   };
-}();
+}());
 (function injectSharedStyles() {
   if (document.getElementById('wander-shared-styles')) return;
   var style = document.createElement('style');

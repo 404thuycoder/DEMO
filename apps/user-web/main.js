@@ -215,17 +215,27 @@
   function toggleWish(placeId) {
     var w = getWishlist();
     var i = w.indexOf(placeId);
-    if (i === -1) w.push(placeId);else w.splice(i, 1);
+    var action = (i === -1) ? 'add' : 'remove';
+    
+    if (i === -1) w.push(placeId); else w.splice(i, 1);
     setWishlist(w);
 
     // Sync to user profile if logged in
     var token = localStorage.getItem("wander_token");
     if (token) {
+      // 1. Sync user's private favorites list
       fetch('/api/auth/user/sync-favorites', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-auth-token': token },
         body: JSON.stringify({ favorites: w })
-      }).catch(err => console.debug('Sync favorites failed:', err));
+      }).catch(err => console.debug('Sync user favorites failed:', err));
+
+      // 2. Sync global place favorites count and notify business
+      fetch(`/api/places/${placeId}/favorite`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-auth-token': token },
+        body: JSON.stringify({ action: action })
+      }).catch(err => console.debug('Sync global favorites failed:', err));
     }
     
     return i === -1;
@@ -296,33 +306,7 @@
     });
   }
 
-  /* ——— Header / nav ——— */
-  var header = document.querySelector("[data-header]");
-  var navToggle = document.querySelector("[data-nav-toggle]");
-  var siteNav = document.querySelector("[data-nav]");
-  function onScroll() {
-    if (!header) return;
-    header.classList.toggle("is-scrolled", window.scrollY > 24);
-  }
-  window.addEventListener("scroll", onScroll, {
-    passive: true
-  });
-  onScroll();
-  function setNavOpen(open) {
-    if (siteNav) siteNav.classList.toggle("is-open", open);
-    if (header) header.classList.toggle("is-nav-open", open);
-    if (navToggle) navToggle.setAttribute("aria-expanded", open ? "true" : "false");
-  }
-  if (navToggle && siteNav) {
-    navToggle.addEventListener("click", function () {
-      setNavOpen(!siteNav.classList.contains("is-open"));
-    });
-    siteNav.querySelectorAll('a[href^="#"]').forEach(function (link) {
-      link.addEventListener("click", function () {
-        setNavOpen(false);
-      });
-    });
-  }
+  // Redundant header/nav logic removed. Handled by SharedUI.js
   var yearEl = document.querySelector("[data-year]");
   if (yearEl) yearEl.textContent = String(new Date().getFullYear());
 
@@ -1031,17 +1015,12 @@
                           topBadge + verifiedBadge + 
                         '</div>' +
                        '<div class="dest-card-body">' +
-                         '<div class="dest-meta-row">' +
-                           '<span class="dest-pill">' + budgetLabel(p.budget) + '</span>' +
-                           '<span class="dest-pill">' + paceVi(p.pace) + '</span>' +
-                         '</div>' +
+                         '<div class="dest-card-meta">' + escapeHtml(p.region || 'Việt Nam') + '</div>' +
                          '<h3 class="dest-card-title">' + escapeHtml(p.name || '') + '</h3>' +
-                         '<p class="dest-card-meta">' + escapeHtml(p.region || '') + " · " + escapeHtml(p.meta || '') + '</p>' +
-                         '<p class="dest-card-text">' + escapeHtml(p.text || '') + '</p>' +
-                         '<div class="dest-card-actions">' +
-                           wishHtml +
-                           '<button type="button" class="btn btn--primary btn--small" data-detail="' + escapeAttr(p.id) + '">Chi tiết</button>' +
-                           '<button type="button" class="btn btn--ghost btn--small btn-add-trip" data-add-stop-id="' + escapeAttr(p.id) + '">+ Lịch</button>' +
+                         '<p class="dest-card-text">' + escapeHtml(p.text || 'Khám phá vẻ đẹp tiềm ẩn của địa danh này...') + '</p>' +
+                         '<div class="dest-card-actions" style="display:flex; justify-content:space-between; align-items:center; margin-top:1rem;">' +
+                           '<a href="#dest-details" class="dest-card-link" onclick="openPlaceModal(\'' + p.id + '\')">Chi tiết →</a>' +
+                           '<button type="button" class="btn btn--primary btn--small btn-add-trip" data-add-stop-id="' + escapeAttr(p.id) + '"><span>+</span> Chuyến đi</button>' +
                          '</div>' +
                        '</div>';
         destGrid.appendChild(art);
@@ -1341,7 +1320,10 @@
           '</div>' +
           galleryHtml +
           '<div class="place-detail__info-wrap">' +
-            '<h3 class="place-detail__title-v2">' + escapeHtml(p.name) + '</h3>' +
+            '<div style="display:flex; justify-content:space-between; align-items:flex-start;">' +
+              '<h3 class="place-detail__title-v2">' + escapeHtml(p.name) + '</h3>' +
+              '<div style="font-size:0.75rem; background:rgba(0,0,0,0.05); padding:4px 8px; border-radius:10px; font-weight:700; color:var(--text-muted);">#' + p.id + '</div>' +
+            '</div>' +
             '<p class="place-detail__meta-v2">📍 ' + escapeHtml(p.region) + " · " + budgetLabel(p.budget) + " · " + paceVi(p.pace) + '</p>' +
             '<div class="place-detail__desc">' + escapeHtml(p.text || "") + '</div>' +
             '<div class="place-detail__guide">' +
@@ -1355,7 +1337,24 @@
           '</div>' + 
           sectionsHtml + 
           '<div id="place-map" class="place-detail__map-v2"></div>' + 
+          '<div class="place-detail__reviews-v2">' +
+            '<h4 class="detail-section-title">💬 Đánh giá từ khách du lịch</h4>' +
+            '<div class="reviews-list" id="modal-reviews-list">' + (p.reviews && p.reviews.length > 0 ? p.reviews.map(function(r){
+              return '<div class="review-item-v2">' +
+                '<div class="review-header"><strong>' + escapeHtml(r.userName || 'Người dùng WanderViệt') + '</strong><span class="review-stars">' + '★'.repeat(r.rating) + '☆'.repeat(5-r.rating) + '</span></div>' +
+                '<p class="review-text">' + escapeHtml(r.comment) + '</p>' +
+                '<div class="review-date">' + new Date(r.createdAt).toLocaleDateString('vi-VN') + '</div>' +
+              '</div>';
+            }).join('') : '<p class="empty-reviews">Chưa có đánh giá nào. Hãy là người đầu tiên!</p>') + '</div>' +
+            (getSession() ? '<div class="review-form-v2">' +
+              '<h5>Gửi đánh giá của bạn</h5>' +
+              '<div class="rating-input" id="modal-rating-input">' + [5,4,3,2,1].map(function(s){ return '<span data-star="' + s + '">☆</span>'; }).join('') + '</div>' +
+              '<textarea id="modal-review-text" placeholder="Chia sẻ trải nghiệm của bạn tại đây..."></textarea>' +
+              '<button type="button" class="btn btn--primary btn--block" id="btn-submit-review">Gửi đánh giá</button>' +
+            '</div>' : '<p class="review-login-hint">Vui lòng <a href="#" onclick="openModal(\'auth\'); return false;">đăng nhập</a> để gửi đánh giá.</p>') +
+          '</div>' +
           '<div class="place-detail__actions-v2">' + 
+            (p.ownerId ? '<button type="button" class="btn btn--primary" id="btn-open-booking" style="background:var(--accent-warm); border-color:var(--accent-warm);">🚀 Đặt ngay</button>' : '') +
             '<button type="button" class="btn btn--primary" data-modal-add="' + escapeAttr(p.id) + '">Thêm vào lịch trình</button>' + 
             '<button type="button" class="btn btn--ghost" data-modal-wish="' + escapeAttr(p.id) + '">' + (wishIsOn(p.id) ? '♥ Đã lưu' : '♡ Yêu thích') + (p.favoritesCount ? ' <span class="wish-count">' + p.favoritesCount + '</span>' : '') + '</button>' +
           '</div>' +
@@ -1405,6 +1404,72 @@
         wb.innerHTML = (on ? '♥ Đã lưu' : '♡ Yêu thích') + (p.favoritesCount > 0 ? ' <span class="wish-count">' + p.favoritesCount + '</span>' : '');
         fetch('/api/places/' + p.id + '/favorite', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: on ? 'add' : 'remove' }) }).then(function(r){return r.json();}).then(function(j){ if(j.success){ p.favoritesCount=j.favoritesCount; renderDestCards(); renderPersonalSection(); }});
       });
+
+      const btnOpenBooking = wrap.querySelector("#btn-open-booking");
+      if (btnOpenBooking) {
+        btnOpenBooking.addEventListener("click", function() {
+          const sess = getSession();
+          if (!sess) {
+            alert('Vui lòng đăng nhập để đặt dịch vụ');
+            openModal('auth');
+            return;
+          }
+          document.getElementById('booking-place-id').value = p.id;
+          document.getElementById('booking-place-name').textContent = p.name;
+          document.getElementById('booking-customer-name').value = getProfile().displayName || '';
+          openModal('booking');
+        });
+      }
+
+      // Review Submission Logic
+      const reviewBtn = wrap.querySelector("#btn-submit-review");
+      if (reviewBtn) {
+        let selectedRating = 5;
+        const stars = wrap.querySelectorAll("#modal-rating-input span");
+        stars.forEach(s => {
+          s.onclick = function() {
+            selectedRating = parseInt(this.getAttribute('data-star'));
+            stars.forEach(st => {
+              const val = parseInt(st.getAttribute('data-star'));
+              st.innerHTML = val <= selectedRating ? '★' : '☆';
+              st.style.color = val <= selectedRating ? '#fbbf24' : '#64748b';
+            });
+          };
+        });
+
+        reviewBtn.onclick = async function() {
+          const text = wrap.querySelector("#modal-review-text").value.trim();
+          if (!text) return WanderToast.error("Vui lòng nhập nội dung đánh giá");
+          
+          reviewBtn.disabled = true;
+          reviewBtn.textContent = "Đang gửi...";
+          
+          try {
+            const res = await fetch('/api/places/' + p.id + '/review', {
+              method: 'POST',
+              headers: { 
+                'Content-Type': 'application/json',
+                'x-auth-token': localStorage.getItem('wander_token')
+              },
+              body: JSON.stringify({ rating: selectedRating, comment: text })
+            });
+            const data = await res.json();
+            if (data.success) {
+              WanderToast.success("Cảm ơn bạn đã đánh giá!");
+              // Close and reopen to refresh (simple way)
+              openPlaceModal(p.id);
+            } else {
+              WanderToast.error(data.message || "Không thể gửi đánh giá");
+              reviewBtn.disabled = false;
+              reviewBtn.textContent = "Gửi đánh giá";
+            }
+          } catch(e) {
+            WanderToast.error("Lỗi kết nối máy chủ");
+            reviewBtn.disabled = false;
+            reviewBtn.textContent = "Gửi đánh giá";
+          }
+        };
+      }
 
       setTimeout(function () { initPlaceMap(p); }, 200);
     }).catch(function(err) { wrap.innerHTML = '<p style="padding:2rem; text-align:center;">Lỗi tải dữ liệu.</p>'; });
@@ -2808,8 +2873,124 @@
     } else if (hash === '#offers') {
       var offerSec = document.getElementById('offers');
       if (offerSec) offerSec.scrollIntoView({ behavior: 'smooth' });
+    } else if (hash === '#planner') {
+      var plannerSec = document.getElementById('planner');
+      if (plannerSec) {
+        plannerSec.hidden = false;
+        plannerSec.scrollIntoView({ behavior: 'smooth' });
+      }
     }
   }
+
+  // --- Booking Form Submission ---
+  const bookingForm = document.getElementById('booking-form');
+  if (bookingForm) {
+    bookingForm.onsubmit = function(e) {
+      e.preventDefault();
+      const token = localStorage.getItem('wander_token');
+      if (!token) { alert('Vui lòng đăng nhập lại'); return; }
+
+      const data = {
+        placeId: document.getElementById('booking-place-id').value,
+        useDate: document.getElementById('booking-date').value,
+        peopleCount: parseInt(document.getElementById('booking-people').value),
+        customerName: document.getElementById('booking-customer-name').value,
+        customerPhone: document.getElementById('booking-phone').value
+      };
+
+      fetch('/api/bookings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-auth-token': token },
+        body: JSON.stringify(data)
+      })
+      .then(r => r.json())
+      .then(json => {
+        if (json.success) {
+          alert('Đặt chỗ thành công! Doanh nghiệp sẽ sớm liên hệ xác nhận với bạn.');
+          closeModals();
+        } else {
+          alert('Lỗi: ' + json.message);
+        }
+      })
+      .catch(err => {
+        console.error('Booking error:', err);
+        alert('Lỗi kết nối máy chủ');
+      });
+    };
+  }
+
+  // --- Business Services (Partner Tours) ---
+  function renderBusinessServices() {
+    const grid = document.getElementById('biz-services-grid');
+    if (!grid) return;
+
+    // Skip if we are on the dedicated business-services.html page to avoid duplication
+    if (window.location.pathname.includes('business-services.html')) return;
+
+
+    fetch('/api/places')
+      .then(r => r.json())
+      .then(json => {
+        if (!json.success) {
+          grid.innerHTML = '<p style="grid-column:1/-1;text-align:center;padding:2rem;">Lỗi tải dữ liệu đối tác</p>';
+          return;
+        }
+
+        // Filter places that have an owner (business services)
+        const bizPlaces = json.data.filter(p => p.ownerId);
+
+        if (bizPlaces.length === 0) {
+          grid.innerHTML = '<p style="grid-column:1/-1;text-align:center;padding:4rem;color:#94a3b8;">Hiện chưa có tour du lịch nào từ đối tác.</p>';
+          return;
+        }
+
+        grid.innerHTML = bizPlaces.map(p => {
+          const rating = p.rating || 0;
+          const stars = '★'.repeat(Math.floor(rating)) + '☆'.repeat(5 - Math.floor(rating));
+          
+          return `
+            <article class="biz-card">
+              <div class="biz-card__img" style="background-image: url('${p.image || 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=600&q=80'}')">
+                <span class="biz-card__badge">PARTNER SERVICE</span>
+              </div>
+              <div class="biz-card__content">
+                <h3 class="biz-card__title">${p.name}</h3>
+                <div class="biz-card__meta">
+                  <span style="color:#fbbf24;">${stars} <span style="color:#94a3b8; font-size:0.8rem;">(${p.reviewsCount || 0} đánh giá)</span></span>
+                  <span>❤️ ${p.favoritesCount || 0}</span>
+                </div>
+                <div class="biz-card__actions">
+                  <button class="btn-biz btn-biz--primary" onclick="openPlaceModal('${p.id}')">🚀 CHI TIẾT & ĐẶT LỊCH</button>
+                  <button class="btn-biz btn-biz--outline" onclick="openChatWithBusiness('${p.ownerId}', '${p.name}')" title="Chăm sóc khách hàng">💬</button>
+                </div>
+              </div>
+            </article>
+          `;
+        }).join('');
+      })
+      .catch(err => {
+        console.error('Error fetching biz services:', err);
+        grid.innerHTML = '<p style="grid-column:1/-1;text-align:center;padding:2rem;">Lỗi kết nối máy chủ</p>';
+      });
+  }
+
+  window.openChatWithBusiness = function(ownerId, placeName) {
+    // This will toggle the existing chatbot and send a special message or context
+    const chatBtn = document.querySelector('.chat-brain-toggle');
+    if (chatBtn) {
+      chatBtn.click();
+      // Wait for chat to open then inject context
+      setTimeout(() => {
+        const chatInput = document.querySelector('.chat-brain-input');
+        if (chatInput) {
+          chatInput.value = `Xin chào, tôi muốn hỏi về dịch vụ "${placeName}" của quý đối tác.`;
+          chatInput.focus();
+        }
+      }, 500);
+    }
+  };
+
+  renderBusinessServices();
 
   window.addEventListener('hashchange', handleHashActions);
   setTimeout(handleHashActions, 1000); // Initial check

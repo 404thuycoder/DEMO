@@ -5,6 +5,18 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>TTC Travel Business</title>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script>
+  // AUTH GUARD — chạy trước khi render bất cứ thứ gì
+  (function() {
+    var token = localStorage.getItem('biz_auth_token') ||
+                sessionStorage.getItem('biz_auth_token') ||
+                localStorage.getItem('wander_business_token') ||
+                sessionStorage.getItem('wander_business_token');
+    if (!token) {
+      window.location.replace('dashboard.html');
+    }
+  })();
+</script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;font-family:'Plus Jakarta Sans',sans-serif}
 body{background:#f5f6fa;color:#1a1a2e;display:flex;min-height:100vh}
@@ -126,24 +138,24 @@ td{padding:11px 16px;border-bottom:1px solid #f5f6fa}
   </div>
   <div class="profile">
     <div class="profile-card">
-      <div class="avatar">🏨</div>
+      <div class="avatar" id="sidebar-avatar">🏨</div>
       <div>
-        <div class="p-name">Ha Long Luxury Hotel <span style="color:#3b82f6">✓</span></div>
-        <div class="p-badge">PLATINUM</div>
+        <div class="p-name" id="sidebar-name">Đang tải... <span>✓</span></div>
+        <div class="p-badge" id="sidebar-tier">PARTNER</div>
       </div>
     </div>
   </div>
   <nav>
-    <a class="nav-item active" href="#">🏠 Tổng quan</a>
-    <a class="nav-item" href="#">⚙️ Quản lý dịch vụ</a>
-    <a class="nav-item" href="#">📋 Đơn đặt dịch vụ</a>
-    <a class="nav-item" href="#">💬 Nhắn tin <span class="nav-badge">12</span></a>
-    <a class="nav-item" href="#">⭐ Đánh giá</a>
-    <a class="nav-item" href="#">💰 Doanh thu</a>
-    <a class="nav-item" href="#">📊 Thống kê</a>
-    <a class="nav-item" href="#">👥 Khách hàng</a>
-    <a class="nav-item" href="#">🔧 Cài đặt</a>
-    <a class="nav-item" href="#">❓ Hỗ trợ</a>
+    <a class="nav-item active" href="#" data-view="dashboard">🏠 Tổng quan</a>
+    <a class="nav-item" href="#" data-view="services">⚙️ Quản lý dịch vụ</a>
+    <a class="nav-item" href="#" data-view="bookings">📋 Đơn đặt dịch vụ</a>
+    <a class="nav-item" href="#" data-view="messages">💬 Nhắn tin <span class="nav-badge" id="nav-msg-badge">0</span></a>
+    <a class="nav-item" href="#" data-view="reviews">⭐ Đánh giá</a>
+    <a class="nav-item" href="#" data-view="revenue">💰 Doanh thu</a>
+    <a class="nav-item" href="#" data-view="analytics">📊 Thống kê</a>
+    <a class="nav-item" href="#" data-view="customers">👥 Khách hàng</a>
+    <a class="nav-item" href="#" data-view="settings">🔧 Cài đặt</a>
+    <a class="nav-item" href="#" data-view="support">❓ Hỗ trợ</a>
   </nav>
   <div class="premium">
     <div style="font-size:22px">👑</div>
@@ -152,7 +164,7 @@ td{padding:11px 16px;border-bottom:1px solid #f5f6fa}
     <button>Nâng cấp ngay</button>
   </div>
   <div class="logout">
-    <button>🚪 Đăng xuất</button>
+    <button onclick="window.bizLogout()">🚪 Đăng xuất</button>
   </div>
 </div>
 
@@ -160,17 +172,18 @@ td{padding:11px 16px;border-bottom:1px solid #f5f6fa}
   <div class="topbar">
     <div class="topbar-left">
       <h2>Tổng quan</h2>
-      <p>Quản lý và phát triển doanh nghiệp của bạn</p>
+      <p id="biz-breadcrumb">Quản lý và phát triển doanh nghiệp của bạn</p>
     </div>
     <div class="date-chip">📅 01/05/2024 – 31/05/2024</div>
     <div class="search"><span>🔍</span><input placeholder="Tìm kiếm dịch vụ, đặt chỗ..."></div>
-    <div class="bell">🔔<div class="bell-badge">9</div></div>
-    <div class="user-chip">
+    <div class="bell">🔔<div class="bell-badge" id="nav-bell-badge">0</div></div>
+    <div class="user-chip" onclick="window.bizLogout()" title="Đăng xuất">
       <div style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#667eea,#764ba2);display:flex;align-items:center;justify-content:center;font-size:13px">🏨</div>
-      Ha Long Luxury Hotel ▾
+      <span id="topbar-username">Đang tải...</span> ▾
     </div>
   </div>
 
+  <div id="dashboard-view" class="biz-view">
   <div class="main">
     <div class="main-col">
       <div id="dashboard-stats"></div>
@@ -188,17 +201,16 @@ td{padding:11px 16px;border-bottom:1px solid #f5f6fa}
     <div class="right">
       <div class="widget">
         <div class="wh"><span class="wt">Thông báo</span><span class="wl">Xem tất cả</span></div>
-        <div class="ni"><div class="ni-icon ni-blue">📅</div><div><div class="ni-text">Bạn có 5 đơn đặt chỗ mới</div><div class="ni-time">2 phút trước</div></div></div>
-        <div class="ni"><div class="ni-icon ni-orange">💬</div><div><div class="ni-text">Nguyễn Văn A đã gửi tin nhắn</div><div class="ni-time">15 phút trước</div></div></div>
-        <div class="ni"><div class="ni-icon ni-yellow">⭐</div><div><div class="ni-text">Đánh giá mới từ Trần Thị B ⭐ 5</div><div class="ni-time">1 giờ trước</div></div></div>
-        <div class="ni"><div class="ni-icon ni-green">✅</div><div><div class="ni-text">Dịch vụ "Tour Hạ Long 2 ngày 1 đêm" đã được duyệt</div><div class="ni-time">2 giờ trước</div></div></div>
+        <div id="notif-list-container">
+          <p style="padding:16px; font-size:12px; color:#888; text-align:center;">Chưa có thông báo mới</p>
+        </div>
       </div>
 
       <div class="widget">
         <div class="wh"><span class="wt">Hiệu suất 7 ngày qua</span><span class="wl">7 ngày ▾</span></div>
-        <div class="pi"><div class="pi-label">Doanh thu</div><div class="pi-row"><div class="pi-val">45.2M</div><div class="pi-trend">↑ 15%</div></div></div>
-        <div class="pi"><div class="pi-label">Lượt xem</div><div class="pi-row"><div class="pi-val">1.234</div><div class="pi-trend">↑ 12%</div></div></div>
-        <div class="pi"><div class="pi-label">Đơn đặt chỗ</div><div class="pi-row"><div class="pi-val">67</div><div class="pi-trend">↑ 8%</div></div></div>
+        <div class="pi"><div class="pi-label">Doanh thu</div><div class="pi-row"><div class="pi-val">0</div><div class="pi-trend" style="color:#888">0%</div></div></div>
+        <div class="pi"><div class="pi-label">Lượt xem</div><div class="pi-row"><div class="pi-val">0</div><div class="pi-trend" style="color:#888">0%</div></div></div>
+        <div class="pi"><div class="pi-label">Đơn đặt chỗ</div><div class="pi-row"><div class="pi-val">0</div><div class="pi-trend" style="color:#888">0%</div></div></div>
       </div>
 
       <div class="widget">
@@ -207,10 +219,37 @@ td{padding:11px 16px;border-bottom:1px solid #f5f6fa}
           <div class="q-item"><div class="q-icon qi-purple">➕</div><div class="q-lbl">Thêm dịch vụ</div></div>
           <div class="q-item"><div class="q-icon qi-blue">⚙️</div><div class="q-lbl">Quản lý dịch vụ</div></div>
           <div class="q-item"><div class="q-icon qi-green">📋</div><div class="q-lbl">Xem đơn đặt chỗ</div></div>
-          <div class="q-item"><div class="q-icon qi-violet">💬<div class="qb">12</div></div><div class="q-lbl">Nhắn tin</div></div>
+          <div class="q-item"><div class="q-icon qi-violet">💬<div class="qb" id="quick-msg-badge">0</div></div><div class="q-lbl">Nhắn tin</div></div>
         </div>
       </div>
     </div>
+  </div>
+  </div>
+
+  <!-- Additional Views (Managed by biz-extend.js) -->
+  <div id="analytics-view" class="biz-view" style="display:none; padding: 20px;">
+    <div class="card" style="padding: 24px;">
+       <h3 style="margin-bottom: 20px;">Thống kê chi tiết</h3>
+       <div class="stats" style="margin-bottom: 30px;">
+          <div class="stat"><div class="stat-label">Tổng lượt xem</div><div class="stat-num" id="an-views">0</div></div>
+          <div class="stat"><div class="stat-label">Tổng đánh giá</div><div class="stat-num" id="an-reviews">0</div></div>
+          <div class="stat"><div class="stat-label">Dịch vụ hoạt động</div><div class="stat-num" id="an-services">0</div></div>
+          <div class="stat"><div class="stat-label">Rating trung bình</div><div class="stat-num" id="an-rating">0</div></div>
+       </div>
+       <table>
+          <thead>
+             <tr><th>Tên dịch vụ</th><th>Lượt xem</th><th>Đánh giá</th><th>Rating TB</th><th>Trạng thái</th></tr>
+          </thead>
+          <tbody id="analytics-tbody"></tbody>
+       </table>
+    </div>
+  </div>
+
+  <div id="messages-view" class="biz-view" style="display:none; padding: 20px;">
+     <div class="card" style="padding: 24px;">
+        <div class="wh" style="margin-bottom: 20px;"><span class="wt">Tin nhắn khách hàng</span><span class="wl" id="messages-count">0 phản hồi</span></div>
+        <div id="messages-list" style="display:flex; flex-direction:column; gap:16px;"></div>
+     </div>
   </div>
 </div>
 
@@ -225,8 +264,42 @@ td{padding:11px 16px;border-bottom:1px solid #f5f6fa}
 <script src="updateServiceStatus.js"></script>
 <script src="paginationServices.js"></script>
 <script src="addServiceForm.js"></script>
+<script src="biz-extend.js"></script>
 <script>
-  document.addEventListener('DOMContentLoaded', () => {
+  document.addEventListener('DOMContentLoaded', async () => {
+    // One-time cleanup of legacy mock data from localStorage
+    if (!localStorage.getItem('v1_reset_done')) {
+      ['businesses', 'bookings', 'notifications', 'conversations'].forEach(k => localStorage.removeItem(k));
+      localStorage.setItem('v1_reset_done', 'true');
+      console.log('Legacy mock data cleared from localStorage.');
+    }
+
+    var token = localStorage.getItem('biz_auth_token') ||
+                sessionStorage.getItem('biz_auth_token') ||
+                localStorage.getItem('wander_business_token') ||
+                sessionStorage.getItem('wander_business_token');
+
+    // Render tên user từ API
+    try {
+      var meRes = await fetch('/api/auth/business/me', { headers: { 'x-auth-token': token } });
+      var meData = await meRes.json();
+      if (meData.success && meData.user) {
+        var bizName = meData.user.name || meData.user.displayName || 'Doanh nghiệp';
+        var nameEl = document.getElementById('sidebar-name');
+        var topbarEl = document.getElementById('topbar-username');
+        var avatarEl = document.getElementById('sidebar-avatar');
+        var tierEl = document.getElementById('sidebar-tier');
+        if (nameEl) nameEl.innerHTML = `
+          <div style="font-weight:700; font-size:13px; color:#222;">${esc(bizName)} <span>✓</span></div>
+          <div style="font-size:10px; color:#764ba2; font-weight:700; margin-top:2px;">ID: ${esc(meData.user.customId || '')}</div>
+        `;
+        if (topbarEl) topbarEl.textContent = bizName;
+        if (avatarEl) avatarEl.textContent = bizName.charAt(0).toUpperCase();
+        if (tierEl) tierEl.textContent = (meData.user.points || 0) >= 1000 ? 'PLATINUM' : 'PARTNER';
+      }
+    } catch(e) {}
+
+    // Khởi tạo các component dashboard
     renderStats('dashboard-stats');
     initServiceFilter('tab-bar', 'service-grid');
     initSearchServices('search-wrap', 'tab-bar', 'service-grid');

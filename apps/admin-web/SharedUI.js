@@ -2,7 +2,7 @@
  * WanderViệt Shared UI Logic
  * Handles Theme, Settings Drawer, and Toast system across all portals.
  */
-window.WanderUI = (function() {
+window.WanderUI = Object.assign(window.WanderUI || {}, (function() {
   'use strict';
 
   const STORAGE_THEME = 'wander_theme';
@@ -86,7 +86,7 @@ window.WanderUI = (function() {
   initTheme();
 
   return { setTheme, toggleTheme, showToast, setButtonLoading };
-})();
+})());
 
 (function injectSharedStyles() {
   if (document.getElementById('wander-shared-styles')) return;

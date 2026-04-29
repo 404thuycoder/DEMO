@@ -48,7 +48,8 @@ router.post('/generate', optionalAuth, async (req, res) => {
     }
 
     // Pre-process: detect special time-sensitive activities for the prompt
-    const interestsLower = (interests || '').toLowerCase();
+    const interestsStr = Array.isArray(interests) ? interests.join(', ') : (interests || '');
+    const interestsLower = interestsStr.toLowerCase();
     const hasSunriseActivity = interestsLower.includes('săn mây') || interestsLower.includes('bình minh') || interestsLower.includes('sunrise') || interestsLower.includes('mặt trời mọc');
     const hasSunsetActivity = interestsLower.includes('hoàng hôn') || interestsLower.includes('sunset');
     const hasTrekking = interestsLower.includes('trekking') || interestsLower.includes('leo núi');
@@ -65,7 +66,7 @@ router.post('/generate', optionalAuth, async (req, res) => {
 - Phương tiện: ${transport}
 - Đi cùng: ${companion}
 - Nhịp độ: ${pace}
-- Yêu cầu đặc biệt: "${interests || 'Không có'}"
+- Yêu cầu đặc biệt: "${interestsStr || 'Không có'}"
 - Chế độ: ${req.body.isShortTerm ? 'HOẠT ĐỘNG NGẮN / ĐI ĂN / ĐI CHƠI TRONG NGÀY' : 'CHUYẾN ĐI DÀI NGÀY'}
 - Thời gian cụ thể (nếu có): ${req.body.outingTime || 'Không có'}
 
@@ -185,22 +186,33 @@ Quy tắc tuyệt đối:
     // Lấy thông tin chi tiết người dùng nếu đang đăng nhập để lưu vào DB cho dễ xem
     let userName = 'Khách vãng lai';
     let userEmail = '';
+    let userDoc = null;
     if (req.user) {
-      const userDoc = await User.findById(req.user.id);
+      userDoc = await User.findOne({
+        $or: [
+          { customId: req.user.id },
+          { id: req.user.id },
+          { _id: mongoose.Types.ObjectId.isValid(req.user.id) ? req.user.id : new mongoose.Types.ObjectId() }
+        ]
+      });
       if (userDoc) {
         userName = userDoc.displayName || userDoc.name;
         userEmail = userDoc.email;
       }
     }
 
+    // DEBUG: Check data types before saving
+    console.log('--- ITINERARY DEBUG ---');
+    console.log('interestsStr type:', typeof interestsStr, 'value:', JSON.stringify(interestsStr));
+    
     // Lưu vào database, tự động gắn userId nếu đang đăng nhập
     const itinerary = new Itinerary({
-      userId: req.user ? req.user.id : null,
-      destination: destination,
-      days: days,
-      budget: budget,
-      companion: companion,
-      interests: interests,
+      userId: userDoc ? userDoc._id : null,
+      destination: String(destination || ""),
+      days: Number(days),
+      budget: String(budget || ""),
+      companion: String(companion || ""),
+      interests: String(interestsStr || ""),
       tripDate: tripDate ? new Date(tripDate) : null,
       planJson: aiPlanJson,
       userName,
@@ -214,7 +226,13 @@ Quy tắc tuyệt đối:
       // Chạy ngầm phần này để không làm chậm / lỗi phản hồi chính của người dùng
       (async () => {
         try {
-          const user = await User.findById(req.user.id);
+          const user = await User.findOne({
+            $or: [
+              { customId: req.user.id },
+              { id: req.user.id },
+              { _id: mongoose.Types.ObjectId.isValid(req.user.id) ? req.user.id : new mongoose.Types.ObjectId() }
+            ]
+          });
           if (user) {
             // Đảm bảo preferenceProfile tồn tại
             if (!user.preferenceProfile) {
@@ -310,11 +328,11 @@ Không bao gồm bất kỳ text nào khác ngoài JSON. Vẫn giữ thời gian
       const oldItin = await Itinerary.findById(itineraryId);
       if (oldItin) {
         const refinedItin = new Itinerary({
-          destination: oldItin.destination,
-          days: oldItin.days,
-          budget: oldItin.budget,
-          companion: oldItin.companion,
-          interests: oldItin.interests,
+          destination: String(oldItin.destination || ""),
+          days: Number(oldItin.days),
+          budget: String(oldItin.budget || ""),
+          companion: String(oldItin.companion || ""),
+          interests: String(oldItin.interests || ""),
           planJson: newPlanJson,
           // Nếu oldItin đã assign cho user (vì đã ấn Save), thì bản Refine này chưa tự động save để tránh rác
           userId: null
@@ -398,7 +416,13 @@ router.post('/smart-wizard', optionalAuth, async (req, res) => {
     // Lấy context từ User profile (nếu có) để AI tự học
     let userContext = "";
     if (req.user) {
-      const user = await User.findById(req.user.id).select('preferenceProfile preferences');
+      const user = await User.findOne({
+        $or: [
+          { customId: req.user.id },
+          { id: req.user.id },
+          { _id: mongoose.Types.ObjectId.isValid(req.user.id) ? req.user.id : new mongoose.Types.ObjectId() }
+        ]
+      }).select('preferenceProfile preferences');
       if (user && user.preferenceProfile) {
         userContext = `\nAI Insights about user: ${user.preferenceProfile.aiInsights.join(', ')}`;
       }
@@ -495,7 +519,13 @@ router.post('/save-manual', auth, async (req, res) => {
     }
 
     // Lấy thông tin user
-    const userDoc = await User.findById(req.user.id);
+    const userDoc = await User.findOne({
+      $or: [
+        { customId: req.user.id },
+        { id: req.user.id },
+        { _id: mongoose.Types.ObjectId.isValid(req.user.id) ? req.user.id : new mongoose.Types.ObjectId() }
+      ]
+    });
     const userName = userDoc ? (userDoc.displayName || userDoc.name) : 'Thành viên';
     const userEmail = userDoc ? userDoc.email : '';
 
@@ -543,7 +573,7 @@ router.get('/my-trips', auth, async (req, res) => {
     const trips = await Itinerary.find({ userId: req.user.id }).sort({ createdAt: -1 });
     res.json({ success: true, data: trips });
   } catch (error) {
-    console.error('Planner DB Error:', error);
+    console.error('Planner DB Error:', error.message || error);
     res.status(500).json({ success: false, message: 'Lỗi server khi lấy danh sách.' });
   }
 });
@@ -567,8 +597,8 @@ router.get('/itinerary/:id', optionalAuth, async (req, res) => {
     // Kiểm tra quyền truy cập (nếu muốn bảo mật) - hiện tại cho phép xem công khai nếu có link
     res.json({ success: true, data: itin });
   } catch (error) {
-    console.error('Fetch Itinerary Error:', error);
-    res.status(500).json({ success: false, message: 'Lỗi server: ' + error.message });
+    console.error('Fetch Itinerary Error:', error.message || error);
+    res.status(500).json({ success: false, message: 'Lỗi server khi lấy chi tiết lịch trình.' });
   }
 });
 
@@ -629,6 +659,52 @@ router.delete('/permanent/:id', auth, async (req, res) => {
     res.json({ success: true, message: 'Đã xóa vĩnh viễn.' });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Lỗi server.' });
+  }
+});
+
+// SO SÁNH ĐỊA ĐIỂM BẰNG AI
+router.post('/compare', async (req, res) => {
+  try {
+    const { place1, place2, budget, companion } = req.body;
+    
+    if (!place1 || !place2) {
+      return res.status(400).json({ success: false, message: 'Vui lòng cung cấp 2 địa điểm để so sánh.' });
+    }
+
+    const prompt = `So sánh chi tiết 2 địa điểm du lịch sau tại Việt Nam:
+    1. ${place1}
+    2. ${place2}
+    
+    Bối cảnh người dùng:
+    - Ngân sách: ${budget || 'Vừa phải'}
+    - Đi cùng: ${companion || 'Bạn bè'}
+    
+    Yêu cầu so sánh theo các tiêu chí:
+    - Chi phí dự kiến (Ăn ở, đi lại)
+    - Hoạt động nổi bật (Mùa này có gì hay?)
+    - Ưu điểm và Nhược điểm của từng nơi.
+    - Kết luận: Nơi nào tốt hơn cho người dùng này?
+    
+    Trả về định dạng JSON:
+    {
+      "comparisonSummary": "Tóm tắt ngắn gọn",
+      "criteria": [
+        { "name": "Tiêu chí", "place1": "Đánh giá nơi 1", "place2": "Đánh giá nơi 2" }
+      ],
+      "verdict": "Lời khuyên cuối cùng"
+    }`;
+
+    const response = await groq.chat.completions.create({
+      model: 'llama-3.1-8b-instant',
+      messages: [{ role: 'user', content: prompt }],
+      response_format: { type: 'json_object' }
+    });
+
+    const result = JSON.parse(response.choices[0].message.content);
+    res.json({ success: true, data: result });
+  } catch (err) {
+    console.error('Lỗi so sánh AI:', err);
+    res.status(500).json({ success: false, message: 'Không thể thực hiện so sánh lúc này.' });
   }
 });
 

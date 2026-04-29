@@ -1,4 +1,5 @@
 const express = require('express');
+const mongoose = require('mongoose');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
@@ -16,8 +17,9 @@ const DEFAULT_ADMIN_EMAIL = 'admin@wanderviet.com';
 const DEFAULT_ADMIN_PASSWORD = 'password@2006';
 
 const signPortalToken = (account, portal, role) => {
+  const accountId = account.customId || account.id || account._id.toString();
   const payload = {
-    id: account.id || account._id.toString(),
+    id: accountId,
     email: account.email,
     name: account.name,
     displayName: account.displayName || account.name,
@@ -28,25 +30,53 @@ const signPortalToken = (account, portal, role) => {
   return jwt.sign(payload, JWT_SECRET, { expiresIn: '7d' });
 };
 
+const generateCustomId = (roleOrKind) => {
+  let prefix = 'user';
+  if (roleOrKind === 'business') prefix = 'business';
+  else if (roleOrKind === 'admin' || roleOrKind === 'superadmin') prefix = 'admin';
+  else if (roleOrKind === 'diem-du-lich' || roleOrKind === 'tour') prefix = 'tour';
+  else if (roleOrKind === 'tien-ich' || roleOrKind === 'service') prefix = 'service';
+  
+  const randomNum = Math.floor(10000000 + Math.random() * 90000000);
+  return `${prefix}${randomNum}`;
+};
+
 const verifyPortalToken = (expectedPortal) => async (req, res, next) => {
   const token = req.header('x-auth-token');
-  if (!token) return res.status(401).json({ success: false, message: 'Không có token, từ chối quyền truy cập' });
+  if (!token) {
+    if (expectedPortal === null) return next(); // sharedAuth: cho phép tiếp tục nếu không có token
+    return res.status(401).json({ success: false, message: 'Không có token, từ chối quyền truy cập' });
+  }
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
     const account = decoded.account || decoded.user || decoded; // Handle old and new formats
-    if (!account || !account.id) return res.status(401).json({ success: false, message: 'Token không hợp lệ' });
+    const accountId = account.id || account._id || account.customId;
+    if (!account || !accountId) return res.status(401).json({ success: false, message: 'Auth: Token missing account ID' });
+    account.id = accountId; // Standardize for rest of logic
     
     if (expectedPortal && account.portal !== expectedPortal) {
-      return res.status(403).json({ success: false, message: 'Token không thuộc portal này' });
+      return res.status(403).json({ success: false, message: `Auth: Portal mismatch (Expected ${expectedPortal}, got ${account.portal})` });
     }
 
     const modelMap = { 'user': User, 'business': BusinessAccount, 'admin': AdminAccount };
     const Model = modelMap[account.portal || expectedPortal];
     
     if (Model) {
-      // Tối ưu: Chỉ cập nhật lastActive nếu lần cập nhật cuối cách đây hơn 5 phút để giảm tải DB Write
-      const accountData = await Model.findById(account.id);
-      if (!accountData) return res.status(401).json({ success: false, message: 'Tài khoản không tồn tại' });
+      const query = {
+        $or: [
+          { customId: accountId },
+          { id: accountId }
+        ]
+      };
+      if (mongoose.Types.ObjectId.isValid(accountId)) {
+        query.$or.push({ _id: accountId });
+      }
+
+      const accountData = await Model.findOne(query);
+      if (!accountData) {
+        console.warn(`Auth: Account ${accountId} not found in ${account.portal || expectedPortal}`);
+        return res.status(401).json({ success: false, message: 'Auth: Account not found in DB' });
+      }
       
       const now = new Date();
       const lastActive = accountData.lastActive || new Date(0);
@@ -55,20 +85,20 @@ const verifyPortalToken = (expectedPortal) => async (req, res, next) => {
         await accountData.save();
       }
 
-      if (accountData.status === 'suspended') return res.status(403).json({ success: false, message: 'Tài khoản của bạn đã bị khóa' });
+      if (accountData.status === 'suspended') return res.status(403).json({ success: false, message: 'Auth: Account suspended' });
       
       req.user = {
-        id: accountData.id,
+        id: accountData.customId || accountData.id || accountData._id.toString(),
         email: accountData.email,
-        role: accountData.role,
+        role: accountData.role || (account.portal === 'admin' ? 'admin' : account.portal),
         status: accountData.status,
         displayName: accountData.displayName || accountData.name,
         name: accountData.name,
-        portal: account.portal
+        portal: account.portal || expectedPortal
       };
     } else {
       req.user = {
-        id: account.id,
+        id: accountId,
         email: account.email,
         role: account.role,
         status: account.status,
@@ -79,8 +109,9 @@ const verifyPortalToken = (expectedPortal) => async (req, res, next) => {
     }
     
     next();
-  } catch (_err) {
-    res.status(401).json({ success: false, message: 'Token không hợp lệ' });
+  } catch (err) {
+    console.error('JWT Verification Error:', err.message);
+    return res.status(401).json({ success: false, message: 'Auth: JWT verification failed', error: err.message });
   }
 };
 
@@ -99,6 +130,7 @@ async function ensureDefaultAdmin() {
   const hashed = await bcrypt.hash(DEFAULT_ADMIN_PASSWORD, 10);
   if (!admin) {
     admin = new AdminAccount({
+      customId: generateCustomId('superadmin'),
       name: 'Super Admin',
       displayName: 'Super Admin',
       email: DEFAULT_ADMIN_EMAIL,
@@ -125,6 +157,7 @@ router.post('/user/register', async (req, res) => {
     let user = await User.findOne({ email: normalizedEmail });
     if (user) return res.status(400).json({ success: false, message: 'Email đã tồn tại' });
     user = new User({
+      customId: generateCustomId('user'),
       name,
       email: normalizedEmail,
       password: await bcrypt.hash(password, 10),
@@ -160,7 +193,13 @@ router.post('/user/login', async (req, res) => {
 
 router.get('/user/me', auth, async (req, res) => {
   try {
-    const user = await User.findById(req.user.id).select('-password');
+    const user = await User.findOne({
+      $or: [
+        { customId: req.user.id },
+        { id: req.user.id },
+        { _id: mongoose.Types.ObjectId.isValid(req.user.id) ? req.user.id : new mongoose.Types.ObjectId() }
+      ]
+    }).select('-password');
     if (!user) return res.status(404).json({ success: false, message: 'Người dùng không tồn tại' });
     res.json({ success: true, user });
   } catch (err) {
@@ -168,24 +207,33 @@ router.get('/user/me', auth, async (req, res) => {
   }
 });
 
-// Lấy thông tin rank của user
+// Lấy thông tin rank của user (Unified endpoint)
 router.get('/user/rank', auth, async (req, res) => {
   try {
-    const user = await User.findById(req.user.id);
-    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
-    const { rank, tier, nextThreshold } = calculateRank(user.points || 0);
+    const user = await User.findOne({
+      $or: [
+        { customId: req.user.id },
+        { id: req.user.id },
+        { _id: mongoose.Types.ObjectId.isValid(req.user.id) ? req.user.id : new mongoose.Types.ObjectId() }
+      ]
+    });
+    if (!user) return res.status(404).json({ success: false, message: 'User not found for rank' });
+    
+    // Ensure rank info exists
+    const rankInfo = calculateRank(user.points || 0);
+    
     res.json({
       success: true,
       points: user.points || 0,
-      rank: user.rank || rank,
-      rankTier: user.rankTier || tier,
-      nextThreshold: nextThreshold,
+      rank: user.rank || rankInfo.rank,
+      rankTier: user.rankTier || rankInfo.tier,
+      nextThreshold: rankInfo.nextThreshold || null,
       claimedQuests: user.claimedQuests || [],
-      // Profile fields for quest tracking
       avatar: user.avatar || '',
-      displayName: user.displayName || '',
+      displayName: user.displayName || user.name || 'Thành viên',
       name: user.name || '',
-      phone: user.phone || ''
+      email: user.email || '',
+      customId: user.customId || user._id.toString()
     });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -195,7 +243,13 @@ router.get('/user/rank', auth, async (req, res) => {
 // Lấy log hoạt động (để tính toán quest)
 router.get('/user/activity', auth, async (req, res) => {
   try {
-    const user = await User.findById(req.user.id);
+    const user = await User.findOne({
+      $or: [
+        { customId: req.user.id },
+        { id: req.user.id },
+        { _id: mongoose.Types.ObjectId.isValid(req.user.id) ? req.user.id : new mongoose.Types.ObjectId() }
+      ]
+    });
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
     res.json({ success: true, activityLog: user.activityLog || [] });
   } catch (err) {
@@ -213,6 +267,7 @@ router.post('/business/register', async (req, res) => {
     const normalizedEmail = String(email || '').toLowerCase();
     // Bỏ check trùng lặp để 1 email tạo nhiều tài khoản
     let account = new BusinessAccount({
+      customId: generateCustomId('business'),
       name,
       displayName: name,
       email: normalizedEmail,
@@ -257,7 +312,13 @@ router.post('/business/login', async (req, res) => {
 
 router.get('/business/me', businessAuth, async (req, res) => {
   try {
-    const account = await BusinessAccount.findById(req.user.id).select('-password');
+    const account = await BusinessAccount.findOne({
+      $or: [
+        { customId: req.user.id },
+        { id: req.user.id },
+        { _id: mongoose.Types.ObjectId.isValid(req.user.id) ? req.user.id : new mongoose.Types.ObjectId() }
+      ]
+    }).select('-password');
     if (!account) return res.status(404).json({ success: false, message: 'Tài khoản doanh nghiệp không tồn tại' });
     res.json({ success: true, user: { ...account.toObject(), role: 'business' } });
   } catch (err) {
@@ -280,6 +341,7 @@ router.post('/admin/create', adminTokenAuth, async (req, res) => {
     let account = await AdminAccount.findOne({ email: normalizedEmail });
     if (account) return res.status(400).json({ success: false, message: 'Email admin đã tồn tại' });
     account = new AdminAccount({
+      customId: generateCustomId('admin'),
       name,
       displayName: name,
       email: normalizedEmail,
@@ -328,7 +390,13 @@ router.get('/admin/list', adminTokenAuth, async (req, res) => {
 
 router.get('/admin/me', adminTokenAuth, async (req, res) => {
   try {
-    const account = await AdminAccount.findById(req.user.id).select('-password');
+    const account = await AdminAccount.findOne({
+      $or: [
+        { customId: req.user.id },
+        { id: req.user.id },
+        { _id: mongoose.Types.ObjectId.isValid(req.user.id) ? req.user.id : new mongoose.Types.ObjectId() }
+      ]
+    }).select('-password');
     if (!account) return res.status(404).json({ success: false, message: 'Tài khoản admin không tồn tại' });
     res.json({ success: true, user: { ...account.toObject(), role: account.role } });
   } catch (err) {
@@ -347,7 +415,13 @@ router.post('/login', (req, res, next) => {
 });
 router.get('/me', auth, async (req, res) => {
   try {
-    const user = await User.findById(req.user.id).select('-password');
+    const user = await User.findOne({
+      $or: [
+        { customId: req.user.id },
+        { id: req.user.id },
+        { _id: mongoose.Types.ObjectId.isValid(req.user.id) ? req.user.id : new mongoose.Types.ObjectId() }
+      ]
+    }).select('-password');
     if (!user) return res.status(404).json({ success: false, message: 'Người dùng không tồn tại' });
     
     // Đảm bảo các trường rank có giá trị mặc định
@@ -395,26 +469,7 @@ function getRankDetails(points) {
   return { current, next };
 }
 
-// Lấy thông tin Rank của User
-router.get('/user/rank', auth, async (req, res) => {
-  try {
-    const user = await User.findById(req.user.id).select('points rank rankTier claimedQuests');
-    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
-    
-    const { current, next } = getRankDetails(user.points || 0);
-    
-    res.json({
-      success: true,
-      points: user.points || 0,
-      rank: user.rank || current.rank,
-      rankTier: user.rankTier || current.tier,
-      nextThreshold: next ? next.min : null,
-      claimedQuests: user.claimedQuests || []
-    });
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
-  }
-});
+// Legacy endpoint removed (Using unified one at line 200)
 
 // Cộng XP và thăng hạng
 router.post('/user/add-xp', auth, async (req, res) => {
@@ -422,7 +477,13 @@ router.post('/user/add-xp', auth, async (req, res) => {
     const { xp, questId, reason } = req.body;
     if (typeof xp !== 'number') return res.status(400).json({ success: false, message: 'XP invalid' });
 
-    let user = await User.findById(req.user.id);
+    let user = await User.findOne({
+      $or: [
+        { customId: req.user.id },
+        { id: req.user.id },
+        { _id: mongoose.Types.ObjectId.isValid(req.user.id) ? req.user.id : new mongoose.Types.ObjectId() }
+      ]
+    });
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
 
     // Tránh cộng trùng quest
@@ -460,7 +521,13 @@ router.put('/profile', auth, async (req, res) => {
   try {
     const { displayName, notes, avatar, phone, preferences } = req.body;
     
-    let user = await User.findById(req.user.id);
+    let user = await User.findOne({
+      $or: [
+        { customId: req.user.id },
+        { id: req.user.id },
+        { _id: mongoose.Types.ObjectId.isValid(req.user.id) ? req.user.id : new mongoose.Types.ObjectId() }
+      ]
+    });
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
     
     if (displayName !== undefined) user.displayName = displayName;
@@ -488,7 +555,13 @@ router.put('/password', auth, async (req, res) => {
       return res.status(400).json({ success: false, message: 'Vui lòng nhập đầy đủ mật khẩu' });
     }
     
-    let user = await User.findById(req.user.id);
+    let user = await User.findOne({
+      $or: [
+        { customId: req.user.id },
+        { id: req.user.id },
+        { _id: mongoose.Types.ObjectId.isValid(req.user.id) ? req.user.id : new mongoose.Types.ObjectId() }
+      ]
+    });
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
     
     // Kiểm tra mật khẩu cũ
@@ -526,7 +599,13 @@ router.get('/leaderboard', async (req, res) => {
 // Thống kê hoạt động cá nhân chính xác
 router.get('/user/stats', auth, async (req, res) => {
   try {
-    const user = await User.findById(req.user.id);
+    const user = await User.findOne({
+      $or: [
+        { customId: req.user.id },
+        { id: req.user.id },
+        { _id: mongoose.Types.ObjectId.isValid(req.user.id) ? req.user.id : new mongoose.Types.ObjectId() }
+      ]
+    });
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
 
     const itineraries = await Itinerary.find({ userId: req.user.id, isDeleted: false });
@@ -596,7 +675,13 @@ router.post('/user/sync-favorites', auth, async (req, res) => {
     const { favorites } = req.body; // Mảng các ID địa điểm mới
     if (!Array.isArray(favorites)) return res.status(400).json({ success: false, message: 'Dữ liệu không hợp lệ' });
     
-    const user = await User.findById(req.user.id);
+    const user = await User.findOne({
+      $or: [
+        { customId: req.user.id },
+        { id: req.user.id },
+        { _id: mongoose.Types.ObjectId.isValid(req.user.id) ? req.user.id : new mongoose.Types.ObjectId() }
+      ]
+    });
     if (!user) return res.status(404).json({ success: false, message: 'Người dùng không tồn tại' });
     
     const oldFavs = user.favorites || [];
@@ -622,4 +707,82 @@ router.post('/user/sync-favorites', auth, async (req, res) => {
   }
 });
 
-module.exports = { router, auth, businessAuth, adminTokenAuth, sharedAuth, JWT_SECRET };
+// QUÊN MẬT KHẨU (Gửi Email)
+const crypto = require('crypto');
+const nodemailer = require('nodemailer');
+
+router.post('/forgot-password', async (req, res) => {
+  try {
+    const { email, portal } = req.body; // portal: 'user', 'business', 'admin'
+    const Model = portal === 'business' ? BusinessAccount : (portal === 'admin' ? AdminAccount : User);
+    
+    const account = await Model.findOne({ email: String(email).toLowerCase() });
+    if (!account) return res.status(404).json({ success: false, message: 'Email không tồn tại trong hệ thống' });
+
+    // Tạo token
+    const token = crypto.randomBytes(20).toString('hex');
+    account.resetPasswordToken = token;
+    account.resetPasswordExpires = Date.now() + 3600000; // 1 giờ
+    await account.save();
+
+    // Gửi email (Simulation/Real)
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS
+      }
+    });
+
+    const resetUrl = `http://localhost:3000/reset-password.html?token=${token}&portal=${portal}`;
+    const mailOptions = {
+      to: account.email,
+      from: process.env.EMAIL_USER,
+      subject: 'Đặt lại mật khẩu WanderViệt',
+      text: `Bạn nhận được email này vì bạn (hoặc ai đó) đã yêu cầu đặt lại mật khẩu cho tài khoản của mình.\n\n` +
+            `Vui lòng nhấp vào liên kết sau hoặc dán vào trình duyệt của bạn để hoàn tất quá trình:\n\n` +
+            `${resetUrl}\n\n` +
+            `Nếu bạn không yêu cầu điều này, vui lòng bỏ qua email này.\n`
+    };
+
+    try {
+      await transporter.sendMail(mailOptions);
+      res.json({ success: true, message: 'Hướng dẫn đặt lại mật khẩu đã được gửi đến email của bạn.' });
+    } catch (mailErr) {
+      console.error('Lỗi gửi mail:', mailErr);
+      // Trả về token trong response để DEV có thể test nếu mail server chưa config xong
+      res.json({ success: true, message: 'Email server đang bảo trì. Token test: ' + token, token });
+    }
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// ĐẶT LẠI MẬT KHẨU MỚI
+router.post('/reset-password/:token', async (req, res) => {
+  try {
+    const { token } = req.params;
+    const { password, portal } = req.body;
+    const Model = portal === 'business' ? BusinessAccount : (portal === 'admin' ? AdminAccount : User);
+
+    const account = await Model.findOne({
+      resetPasswordToken: token,
+      resetPasswordExpires: { $gt: Date.now() }
+    });
+
+    if (!account) return res.status(400).json({ success: false, message: 'Token đặt lại mật khẩu không hợp lệ hoặc đã hết hạn.' });
+
+    // Cập nhật mật khẩu mới
+    const salt = await bcrypt.genSalt(10);
+    account.password = await bcrypt.hash(password, salt);
+    account.resetPasswordToken = undefined;
+    account.resetPasswordExpires = undefined;
+    await account.save();
+
+    res.json({ success: true, message: 'Mật khẩu của bạn đã được cập nhật thành công!' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+module.exports = { router, auth, businessAuth, adminTokenAuth, sharedAuth, signPortalToken, generateCustomId };

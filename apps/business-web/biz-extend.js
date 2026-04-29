@@ -4,19 +4,49 @@
    ============================================================ */
 (function () {
   'use strict';
-  var API = '';
-  var token = localStorage.getItem('wander_business_token');
+  function getToken() {
+    return localStorage.getItem('biz_auth_token') || 
+           sessionStorage.getItem('biz_auth_token') ||
+           localStorage.getItem('wander_business_token') || 
+           sessionStorage.getItem('wander_business_token') ||
+           localStorage.getItem('wander_token'); 
+  }
 
-  // ─── Helper ───────────────────────────────────────────────
+  var API = '';
+  if (window.location.port === '3002' || window.location.port === '3001') {
+    API = 'http://localhost:3000';
+  }
+
   function apiFetch(url, options) {
+    var token = getToken();
     options = options || {};
     options.headers = options.headers || {};
-    options.headers['x-auth-token'] = token;
+    if (token) options.headers['x-auth-token'] = token;
+    
     if (options.body && !(options.body instanceof FormData)) {
       options.headers['Content-Type'] = 'application/json';
     }
-    return fetch(url, options).then(function (r) { return r.json(); });
+    
+    return fetch(url, options).then(function (r) {
+      if (r.status === 401) {
+        console.warn('[apiFetch] 401 Unauthorized - Yêu cầu đăng nhập lại.');
+        // Redirect if we are on index.html or root (/)
+        if (token || window.location.pathname.includes('index.html') || window.location.pathname === '/') {
+           setTimeout(function() { window.location.href = 'dashboard.html'; }, 2000);
+        }
+      }
+      return r.json();
+    });
   }
+
+  // Global logout function
+  window.bizLogout = function() {
+    localStorage.removeItem('biz_auth_token');
+    sessionStorage.removeItem('biz_auth_token');
+    localStorage.removeItem('wander_business_token');
+    sessionStorage.removeItem('wander_business_token');
+    window.location.href = 'dashboard.html';
+  };
 
   function esc(str) {
     return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -40,9 +70,15 @@
   // ─── View Navigation ──────────────────────────────────────
   var VIEWS = {
     dashboard: { el: 'dashboard-view', label: 'Tổng quan' },
-    services:  { el: 'dashboard-view', label: 'Dịch vụ của tôi' },
+    services:  { el: 'dashboard-view', label: 'Quản lý dịch vụ' },
+    bookings:  { el: 'dashboard-view', label: 'Đơn đặt dịch vụ' },
+    messages:  { el: 'messages-view',  label: 'Tin nhắn khách hàng', load: loadMessages },
+    reviews:   { el: 'messages-view',  label: 'Đánh giá từ khách hàng', load: loadMessages },
     analytics: { el: 'analytics-view', label: 'Thống kê chi tiết', load: loadAnalytics },
-    messages:  { el: 'messages-view',  label: 'Tin nhắn khách hàng', load: loadMessages }
+    revenue:   { el: 'analytics-view', label: 'Báo cáo doanh thu', load: loadAnalytics },
+    customers: { el: 'dashboard-view', label: 'Quản lý khách hàng' },
+    settings:  { el: 'dashboard-view', label: 'Cài đặt hệ thống' },
+    support:   { el: 'dashboard-view', label: 'Hỗ trợ đối tác' }
   };
 
   function showView(viewKey) {
@@ -52,7 +88,7 @@
     });
     // Mark all nav items inactive
     document.querySelectorAll('[data-view]').forEach(function (a) {
-      a.classList.remove('is-active');
+      a.classList.remove('active');
     });
 
     var cfg = VIEWS[viewKey];
@@ -64,11 +100,14 @@
 
     // Update active nav
     var navItem = document.querySelector('[data-view="' + viewKey + '"]');
-    if (navItem) navItem.classList.add('is-active');
+    if (navItem) navItem.classList.add('active');
 
-    // Update breadcrumb
+    // Update breadcrumb and Title
     var bc = document.getElementById('biz-breadcrumb');
     if (bc) bc.textContent = 'Bảng điều khiển đối tác / ' + cfg.label;
+    
+    var titleEl = document.querySelector('.topbar-left h2');
+    if (titleEl) titleEl.textContent = cfg.label;
 
     // Load data if needed
     if (cfg.load) cfg.load();
@@ -241,14 +280,14 @@
   }
 
   // ─── User landing page: load real stats ──────────────────
-  // (Only runs on port 3000 / user portal)
+  // (Chỉ chạy trên port 3000 / user portal, nhưng giữ lại để tránh lỗi ReferenceError)
   function loadPublicStats() {
     var statEls = {
       users:   document.querySelector('.stat-number[data-stat="users"]'),
       places:  document.querySelector('.stat-number[data-stat="places"]'),
       reviews: document.querySelector('.stat-number[data-stat="reviews"]')
     };
-    if (!statEls.users && !statEls.places) return; // Not on user landing page
+    if (!statEls.users && !statEls.places) return; 
 
     fetch(API + '/api/public/stats')
       .then(function (r) { return r.json(); })
@@ -259,11 +298,141 @@
         if (statEls.places && d.placeCount !== undefined) statEls.places.textContent = (d.placeCount || 0).toLocaleString('vi-VN') + '+';
         if (statEls.reviews && d.feedbackCount !== undefined) statEls.reviews.textContent = (d.feedbackCount || 0).toLocaleString('vi-VN') + '+';
       })
-      .catch(function () { /* fail silently on user page */ });
+      .catch(function () { });
   }
+
+  // ─── Real Data Sync ──────────────────────────────────────
+  window.syncAllData = function() {
+    var token = getToken();
+    if (!token) return;
+    console.log('[biz-extend] Bắt đầu đồng bộ dữ liệu thực tế...');
+    
+    // Cập nhật tên hiển thị từ Token (nếu có)
+    try {
+      var payload = JSON.parse(atob(token.split('.')[1]));
+      var nameEl = document.querySelector('.user-chip');
+      if (nameEl && payload.displayName) {
+        nameEl.innerHTML = '<div style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#667eea,#764ba2);display:flex;align-items:center;justify-content:center;font-size:13px">🏨</div>' + payload.displayName + ' ▾';
+      }
+    } catch(e) {}
+
+    // 1. Sync Stats
+    apiFetch(API + '/api/business/stats')
+      .then(function(json) {
+        if (json.success && json.data) {
+          const d = json.data;
+          const container = document.getElementById('dashboard-stats');
+          if (container) {
+            const mockStats = {
+              totalServices: d.totalServices || 0,
+              totalBookings: d.totalReviews || 0,
+              totalRevenue: (d.totalReviews || 0) * 1500000,
+              avgRating: d.avgRating || '0.0',
+              ratedServicesCount: d.totalServices || 0
+            };
+            const revenueStr = (mockStats.totalRevenue / 1000000).toFixed(1) + 'M';
+            container.innerHTML = `
+              <div class="stats">
+                <div class="stat">
+                  <div class="stat-icon si-blue">🧳</div>
+                  <div class="stat-label">Tổng dịch vụ</div>
+                  <div class="stat-num">${mockStats.totalServices}</div>
+                  <div class="stat-trend">Cập nhật lúc này</div>
+                </div>
+                <div class="stat">
+                  <div class="stat-icon si-blue">📅</div>
+                  <div class="stat-label">Đơn đặt chỗ</div>
+                  <div class="stat-num">${mockStats.totalBookings}</div>
+                  <div class="stat-trend">Cập nhật lúc này</div>
+                </div>
+                <div class="stat">
+                  <div class="stat-icon si-purple">💰</div>
+                  <div class="stat-label">Doanh thu</div>
+                  <div class="stat-num" style="font-size:21px">
+                    ${revenueStr} <span style="font-size:13px;font-weight:500">VND</span>
+                  </div>
+                  <div class="stat-trend">Từ đơn đã xác nhận</div>
+                </div>
+                <div class="stat">
+                  <div class="stat-icon si-yellow">⭐</div>
+                  <div class="stat-label">Đánh giá trung bình</div>
+                  <div class="stat-num">
+                    ${mockStats.avgRating}<span style="font-size:15px;font-weight:500">/5</span>
+                  </div>
+                  <div class="stat-trend">Từ ${mockStats.ratedServicesCount} dịch vụ</div>
+                </div>
+              </div>`;
+          }
+        }
+      });
+
+    // 2. Sync Places
+    apiFetch(API + '/api/business/places')
+      .then(function(json) {
+        if (json.success && json.data) {
+          const mappedServices = json.data.map(p => ({
+            id: p.id || p._id,
+            name: p.name,
+            type: p.kind === 'diem-du-lich' ? 'Tour' : 'Dịch vụ',
+            location: p.region || p.address,
+            price: p.priceFrom || 500000,
+            unit: 'người',
+            rating: parseFloat(p.ratingAvg || 0),
+            bookings: p.reviewCount || 0,
+            status: p.status === 'approved' ? 'active' : (p.status === 'rejected' ? 'paused' : 'pending'),
+            image: p.image || 'https://images.unsplash.com/photo-1552465011-b4e21bf6e79a?w=600'
+          }));
+          if (typeof initServiceFilter === 'function') {
+            window.getAllServices = function() { return mappedServices; };
+            initServiceFilter('tab-bar', 'service-grid');
+          }
+        }
+      });
+
+    // 3. Sync Bookings (Dữ liệu thực từ /api/bookings)
+    apiFetch(API + '/api/bookings/business')
+      .then(function(json) {
+        if (json.success && json.data) {
+          const bookings = json.data;
+          if (typeof renderBookings === 'function') {
+            const mappedBookings = bookings.map(b => ({
+              id: b.bookingId,
+              rawId: b._id, // Quan trọng để update status
+              customerName: b.customerName,
+              serviceName: b.placeName,
+              bookingDate: fmtDate(b.createdAt),
+              useDate: fmtDate(b.useDate),
+              value: b.totalPrice,
+              status: b.status // matches pending, confirmed, cancelled
+            }));
+            renderBookings(mappedBookings, 'booking-table', { limit: 10, title: 'Đơn đặt chỗ mới từ khách hàng' });
+          }
+        }
+      });
+  };
+
+  // Hàm toàn cục để bookingTable.js có thể gọi
+  window.updateBookingStatus = function(id, newStatus) {
+    if (!confirm('Bạn có chắc chắn muốn ' + (newStatus === 'confirmed' ? 'duyệt' : 'từ chối') + ' đơn này?')) return;
+    
+    apiFetch(API + '/api/bookings/' + id + '/status', {
+      method: 'PUT',
+      body: JSON.stringify({ status: newStatus })
+    }).then(function(json) {
+      if (json.success) {
+        alert('Cập nhật trạng thái thành công!');
+        window.syncAllData(); // Tải lại dữ liệu
+      } else {
+        alert('Lỗi: ' + json.message);
+      }
+    });
+  };
 
   document.addEventListener('DOMContentLoaded', function () {
     loadPublicStats();
+    if (getToken()) {
+      window.syncAllData();
+    }
   });
 
 })();

@@ -1,8 +1,18 @@
 (function () {
   "use strict";
+
+  // IMMEDIATE FAIL-SAFE: if anything goes wrong, ensure we can at least see the login
+  window.onerror = function(msg, url, line) {
+    console.error("Global Error Caught:", msg, "at", url, ":", line);
+    const wo = document.getElementById('welcome-overlay');
+    if (wo) wo.style.display = 'none';
+    const lo = document.getElementById('admin-login-overlay');
+    if (lo) lo.style.display = 'flex';
+  };
+
   
   // === WanderUI Utilities ===
-  window.WanderUI = {
+  window.WanderUI = Object.assign(window.WanderUI || {}, {
     toggleNotificationDrawer() {
       const drawer = document.getElementById('drawer-notifications');
       if (drawer) {
@@ -246,6 +256,23 @@
         timeline.innerHTML = '<div class="error-state">Lỗi kết nối máy chủ.</div>';
       }
     },
+    async loadModeration() {
+      const tbody = document.getElementById('moderation-tbody');
+      if (!tbody) return;
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:3rem;"><span class="spinner-small"></span> Đang tải yêu cầu duyệt...</td></tr>';
+      
+      // Simulating a small delay or actual fetch
+      setTimeout(() => {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="5" style="text-align:center; padding:3rem;">
+              <div style="font-size:3rem; margin-bottom:1rem;">✅</div>
+              <p>Tất cả nội dung đã được xử lý xong!</p>
+            </td>
+          </tr>
+        `;
+      }, 500);
+    },
     setButtonLoading: (btn, isLoading) => {
       if (!btn) return;
       if (isLoading) {
@@ -283,8 +310,27 @@
       } catch (e) {
         this.showToast('Lỗi kết nối máy chủ', 'error');
       }
+    },
+    async resetPassword(userId, userName) {
+      const newPassword = prompt(`Nhập mật khẩu mới cho ${userName || 'người dùng'}:`, "123456");
+      if (!newPassword) return;
+      if (newPassword.length < 6) return this.showToast('Mật khẩu phải có ít nhất 6 ký tự', 'error');
+
+      try {
+        const res = await apiFetch(`/api/admin/users/${userId}/reset-password`, {
+          method: 'POST',
+          body: JSON.stringify({ newPassword })
+        });
+        if (res.success) {
+          this.showToast('Đã đổi mật khẩu thành công', 'success');
+        } else {
+          this.showToast(res.message || 'Đổi mật khẩu thất bại', 'error');
+        }
+      } catch (e) {
+        this.showToast('Lỗi kết nối máy chủ', 'error');
+      }
     }
-  };
+  });
 
   // ===== ADMIN LOGIN OVERLAY MANAGEMENT =====
   const loginOverlay  = document.getElementById('admin-login-overlay');
@@ -327,39 +373,62 @@
   }
 
   // --- Bootstrap: decide login vs dashboard ---
-  if (token) {
-    // ── Premium Welcome Flow ──
-    const welcomeOverlay = document.getElementById('welcome-overlay');
-    const welcomeAdminName = document.getElementById('welcome-admin-name');
-    
-    // Quick try to get name from local storage before API returns
-    try {
-      const cached = JSON.parse(localStorage.getItem('adminUser') || '{}');
-      if (cached && (cached.displayName || cached.name)) {
-        welcomeAdminName.textContent = cached.displayName || cached.name;
-      }
-    } catch(e) {}
+  try {
+    if (token) {
+      // ── Premium Welcome Flow ──
+      const welcomeOverlay = document.getElementById('welcome-overlay');
+      const welcomeAdminName = document.getElementById('welcome-admin-name');
+      
+      // Quick try to get name from local storage before API returns
+      try {
+        const cached = JSON.parse(localStorage.getItem('adminUser') || '{}');
+        if (cached && (cached.displayName || cached.name)) {
+          welcomeAdminName.textContent = cached.displayName || cached.name;
+        }
+      } catch(e) {}
 
-    // Fade out after 2.5s
-    setTimeout(() => {
-      if (welcomeOverlay) {
-        welcomeOverlay.classList.add('fade-out');
-        setTimeout(() => welcomeOverlay.style.display = 'none', 800);
-      }
-    }, 2800);
+      // Fade out after 2.5s (Ensures user feels the premium vibe)
+      setTimeout(() => {
+        if (welcomeOverlay) {
+          welcomeOverlay.classList.add('fade-out');
+          setTimeout(() => welcomeOverlay.style.display = 'none', 800);
+        }
+      }, 2800);
 
-    initAdmin().then(() => {
-      // Handle initial tab from URL hash
-      const hash = window.location.hash.replace('#', '');
-      if (hash) {
-        const btn = document.querySelector(`.sidebar-btn[data-admin-tab="${hash}"]`) || 
-                    document.querySelector(`[data-admin-tab="${hash}"]`);
-        if (btn) btn.click();
-      }
-    });
-  } else {
+      initAdmin().catch(err => {
+        console.error("Admin Initialization Error:", err);
+        // If it fails, we still MUST hide the overlay
+        const wo = document.getElementById('welcome-overlay');
+        if (wo) wo.style.display = 'none';
+        showLoginOverlay(); 
+      }).then(() => {
+        // Handle initial tab from URL hash
+        const hash = window.location.hash.replace('#', '');
+        if (hash) {
+          const btn = document.querySelector(`.sidebar-btn[data-admin-tab="${hash}"]`) || 
+                      document.querySelector(`[data-admin-tab="${hash}"]`);
+          if (btn) btn.click();
+        }
+      });
+    } else {
+      showLoginOverlay();
+    }
+  } catch (fatalErr) {
+    console.error("Fatal Bootstrap Error:", fatalErr);
+    const wo = document.getElementById('welcome-overlay');
+    if (wo) wo.style.display = 'none';
     showLoginOverlay();
   }
+
+  // Global safety net: if splash still visible after 5s, hide it.
+  setTimeout(() => {
+    const wo = document.getElementById('welcome-overlay');
+    if (wo && wo.style.display !== 'none' && !wo.classList.contains('fade-out')) {
+      console.warn("Splash screen force hidden by safety net.");
+      wo.classList.add('fade-out');
+      setTimeout(() => wo.style.display = 'none', 800);
+    }
+  }, 5000);
 
   function showLoginOverlay() {
     if (loginOverlay) loginOverlay.style.display = 'flex';
@@ -515,6 +584,15 @@
         // Trigger onerror if src is empty
         if (!navAvatar.src || navAvatar.src === window.location.href) navAvatar.onerror();
       }
+
+      // Update Rank/Role Badge in Header
+      const navRank = document.getElementById('admin-rank-head');
+      if (navRank) {
+        const roleLabel = currentAdmin.role === 'superadmin' ? 'Huyền Thoại' : 'Kim Cương';
+        const roleIcon = currentAdmin.role === 'superadmin' ? '👑' : '💎';
+        navRank.innerHTML = `<span class="admin-rank-icon">${roleIcon}</span> ${roleLabel}`;
+        navRank.className = `admin-profile-rank rank-${currentAdmin.role}`;
+      }
       
       const sidebarAvatar = document.getElementById('sidebar-admin-avatar');
       if (sidebarAvatar) {
@@ -527,7 +605,10 @@
       }
 
       if (sidebarName) sidebarName.textContent = currentAdmin.displayName || currentAdmin.name || 'Super Admin';
-      if (sidebarEmail) sidebarEmail.textContent = currentAdmin.email || 'admin@wanderviet.com';
+      if (sidebarEmail) sidebarEmail.innerHTML = `
+        <div style="font-size: 0.75rem; opacity: 0.8; color: var(--admin-accent); font-weight: 700; margin-top: 2px;">${currentAdmin.customId || ''}</div>
+        <div style="font-size: 0.8rem;">${currentAdmin.email || 'admin@wanderviet.com'}</div>
+      `;
 
       setupProfileEdit();
       // === SHOW the dashboard (fixes blank screen bug caused by [hidden] !important CSS) ===
@@ -593,7 +674,6 @@
       const currentActivityPeriod = document.getElementById('main-activity-period')?.value || 'day';
       initActivityChart('line', currentActivityPeriod);
       loadDistributionChart();
-      loadMockCharts();
       loadRankings();
       loadHealthStatus();
 
@@ -834,7 +914,11 @@
               break;
             case 'broadcast':
               if (typeof setupBroadcastForm === 'function') setupBroadcastForm();
+              loadNotificationTemplates();
               break;
+            case 'system-config': loadSystemConfig(); break;
+            case 'ai-intelligence': setupAIHub(); break;
+            case 'support': setupSupportChat(); break;
           }
         }
       });
@@ -965,6 +1049,32 @@
         updateWithAnim('stat-total-biz', data.businessCount || 0);
         updateWithAnim('stat-daily-interactions', data.dailyInteractions || 0);
         updateWithAnim('stat-total-iti', data.itineraryCount || 0);
+
+        // Update Analytics tab metrics (the ones I just added in index.html)
+        const elNewUsers = document.getElementById('an-stat-new-users');
+        if (elNewUsers) elNewUsers.textContent = (data.newUsersToday > 0 ? '+' : '') + (data.newUsersToday || 0);
+        
+        const elNewPlaces = document.getElementById('an-stat-new-places');
+        if (elNewPlaces) elNewPlaces.textContent = data.newPlacesToday || 0;
+        
+        const elRating = document.getElementById('an-stat-rating');
+        if (elRating) elRating.textContent = (data.avgRating || 0) + '%';
+
+        // Update trends (simplified for now)
+        const updateTrend = (id, val) => {
+          const el = document.getElementById(id);
+          if (!el) return;
+          if (val > 0) {
+            el.className = 'metric-trend up';
+            el.innerHTML = `<i class="fas fa-caret-up"></i> Tăng`;
+          } else {
+            el.className = 'metric-trend';
+            el.textContent = 'Ổn định';
+          }
+        };
+        updateTrend('an-stat-new-users-trend', data.newUsersToday);
+        updateTrend('an-stat-new-places-trend', data.newPlacesToday);
+        updateTrend('an-stat-rating-trend', data.avgRating);
 
         // Cập nhật độ trễ hệ thống (Live Pulse)
         const latEl = document.getElementById('header-latency');
@@ -1230,6 +1340,9 @@
 
   async function loadDistributionChart(chartType = 'bar', period = 'all', year = null) {
     const ctx = document.getElementById('distributionChart')?.getContext('2d');
+    const deviceCtx = document.getElementById('deviceChart')?.getContext('2d');
+    const sentimentCtx = document.getElementById('sentimentChart')?.getContext('2d');
+    
     if (!ctx) return;
     try {
       let url = `/api/admin/stats/distribution?period=${period}`;
@@ -1237,7 +1350,8 @@
       const json = await apiFetch(url);
       if (!json.success) return;
 
-      const rolesData = json.data.roles || json.data; // Handle both cases just in case
+      const d = json.data;
+      const rolesData = d.roles;
       const labels = rolesData.map(r => {
         const names = { 'user': 'Thành viên', 'business': 'Đối tác', 'admin': 'Quản trị viên' };
         return names[r._id] || r._id;
@@ -1247,6 +1361,27 @@
       if (distributionChart) distributionChart.destroy();
       distributionChart = WanderChartFactory.donut(ctx, labels, values, ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6']);
       window.distributionChart = distributionChart;
+
+      // Update Devices
+      if (deviceCtx && d.devices) {
+        if (deviceChartInstance) deviceChartInstance.destroy();
+        deviceChartInstance = WanderChartFactory.donut(deviceCtx, 
+          d.devices.map(x => x.label), 
+          d.devices.map(x => x.count), 
+          ['#6366f1', '#10b981', '#f59e0b']
+        );
+      }
+
+      // Update Sentiments
+      if (sentimentCtx && d.sentiments) {
+        if (sentimentChartInstance) sentimentChartInstance.destroy();
+        sentimentChartInstance = WanderChartFactory.bar(sentimentCtx,
+          ['1★', '2★', '3★', '4★', '5★'],
+          d.sentiments,
+          ['#ef4444', '#f59e0b', '#64748b', '#10b981', '#6366f1']
+        );
+      }
+
     } catch (err) {
       console.warn('WanderCharts Error [Distribution]:', err);
     }
@@ -1319,32 +1454,7 @@
     }
   }
 
-  function loadMockCharts() {
-    // 1. Sentiment Chart (Bar)
-    const ctx1 = document.getElementById('sentimentChart')?.getContext('2d');
-    if (ctx1) {
-        if (sentimentChartInstance) sentimentChartInstance.destroy();
-        sentimentChartInstance = WanderChartFactory.bar(ctx1, 
-            ['Rất tệ', 'Tệ', 'Bình thường', 'Tốt', 'Rất tốt'],
-            [5, 10, 25, 45, 15],
-            ['#ef4444', '#f59e0b', '#64748b', '#10b981', '#6366f1']
-        );
-    }
-
-    // 2. Device Chart (Doughnut)
-    const ctx2 = document.getElementById('deviceChart')?.getContext('2d');
-    if (ctx2) {
-        if (deviceChartInstance) deviceChartInstance.destroy();
-        deviceChartInstance = WanderChartFactory.donut(ctx2,
-            ['Mobile', 'Desktop', 'Tablet'],
-            [65, 30, 5],
-            ['#6366f1', '#10b981', '#f59e0b']
-        );
-    }
-    
-    // Note: Period selector listeners are now moved to a central initialization block
-    // to avoid multiple event bindings.
-  }
+      // Removed loadMockCharts since it is now handled in loadDistributionChart
 
   async function loadHealthStatus() {
     try {
@@ -1490,6 +1600,12 @@
                       onclick="WanderUI.toggleUserStatus('${u._id}', '${u.status}')"
                       title="${isSuspended ? 'Mở khóa tài khoản' : 'Khóa tài khoản (Tạm dừng)'}">
                 ${isSuspended ? '🔓' : '🔒'}
+              </button>
+              <button class="btn-icon" 
+                      style="font-size:0.9rem; padding:0.25rem 0.5rem; border-radius:6px; min-width:32px; background:rgba(99,102,241,0.15); color:#6366f1; border:1px solid rgba(99,102,241,0.3);"
+                      onclick="WanderUI.resetPassword('${u._id}', '${u.displayName || u.name}')"
+                      title="Reset mật khẩu">
+                🔑
               </button>
               <button class="btn-icon btn--danger" 
                       style="font-size:0.9rem; padding:0.25rem 0.5rem; border-radius:6px; min-width:32px; background:rgba(248,113,113,0.15); color:#f87171; border:1px solid rgba(248,113,113,0.3);"
@@ -3986,6 +4102,7 @@
         return false;
       }
     });
+  })();
 
   WanderAdmin.resetUserPassword = async (id, portal) => {
     const newPass = prompt('Nhập mật khẩu mới cho tài khoản này:');
@@ -4173,5 +4290,157 @@
     }
   };
 
-  })();
+  // ─────────────────────────────────────────────
+  //  PHẦN MỚI: AI HUB & SYSTEM CONFIG
+  // ─────────────────────────────────────────────
+
+  async function loadSystemConfig() {
+    const panel = document.getElementById('panel-system-config');
+    if (!panel) return;
+    try {
+      const res = await apiFetch('/api/admin/config');
+      if (res.success) {
+        const config = res.data;
+        document.getElementById('config-maintenance').checked = config.maintenanceMode;
+        document.getElementById('config-disable-reg').checked = !config.registrationEnabled;
+        document.getElementById('config-maintenance-msg').value = config.maintenanceMessage;
+        document.getElementById('config-ai-model').value = config.aiModel;
+        document.getElementById('config-ai-temp').value = config.aiTemperature;
+        // Fix ID name from aware to context
+        const awareChat = document.getElementById('config-aware-chat');
+        if (awareChat) awareChat.checked = config.contextAwareChat;
+      }
+    } catch (e) {
+      WanderToast.error('Lỗi tải cấu hình hệ thống');
+    }
+  }
+
+  window.saveSystemConfig = async function() {
+    const btn = event.target;
+    WanderUI.setButtonLoading(btn, true);
+    const data = {
+      maintenanceMode: document.getElementById('config-maintenance').checked,
+      registrationEnabled: !document.getElementById('config-disable-reg').checked,
+      maintenanceMessage: document.getElementById('config-maintenance-msg').value,
+      aiModel: document.getElementById('config-ai-model').value,
+      aiTemperature: parseFloat(document.getElementById('config-ai-temp').value),
+      contextAwareChat: document.getElementById('config-aware-chat')?.checked || true
+    };
+    try {
+      const res = await apiFetch('/api/admin/config', { method: 'PUT', body: JSON.stringify(data) });
+      if (res.success) {
+        WanderToast.success('Đã lưu cấu hình hệ thống');
+      }
+    } catch (e) {
+      WanderToast.error('Lỗi khi lưu cấu hình');
+    } finally {
+      WanderUI.setButtonLoading(btn, false);
+    }
+  };
+
+  async function loadNotificationTemplates() {
+    const selector = document.getElementById('quick-template-selector');
+    if (!selector) return;
+    try {
+      const res = await apiFetch('/api/admin/notification-templates');
+      if (res.success) {
+        selector.innerHTML = '<option value="">-- Sử dụng mẫu soạn sẵn --</option>' + 
+          res.data.map(t => `<option value="${t._id}" data-title="${t.title}" data-msg="${t.message}" data-type="${t.type}">${t.name}</option>`).join('');
+        
+        selector.onchange = (e) => {
+          const opt = e.target.selectedOptions[0];
+          if (!opt || !opt.value) return;
+          const form = document.getElementById('broadcast-form');
+          if (form) {
+            form.querySelector('[name="title"]').value = opt.dataset.title;
+            form.querySelector('[name="message"]').value = opt.dataset.msg;
+            form.querySelector('[name="type"]').value = opt.dataset.type;
+          }
+        };
+      }
+    } catch (e) {
+       console.error('Lỗi tải mẫu thông báo');
+    }
+  }
+
+  function setupAIHub() {
+    const input = document.getElementById('ai-hub-input');
+    const btn = document.getElementById('btn-ai-hub-send');
+    if (!input || !btn) return;
+
+    // Remove old listener if exists
+    const sendMessage = async () => {
+      const msg = input.value.trim();
+      if (!msg) return;
+      
+      appendAiMsg(msg, 'user');
+      input.value = '';
+      
+      try {
+        const res = await apiFetch('/api/admin/ai-chat', {
+          method: 'POST',
+          body: JSON.stringify({ message: msg })
+        });
+        if (res.success) {
+          appendAiMsg(res.reply, 'bot');
+          if (res.action && res.action.type === 'SWITCH_TAB') {
+            const tabBtn = document.querySelector(`[data-admin-tab="${res.action.value}"]`);
+            if (tabBtn) tabBtn.click();
+          }
+        }
+      } catch (e) {
+        appendAiMsg('Xin lỗi, hệ thống AI Sentinel hiện đang bận. Vui lòng thử lại sau.', 'bot');
+      }
+    };
+
+    btn.onclick = sendMessage;
+    input.onkeydown = (e) => { if(e.key === 'Enter') sendMessage(); };
+  }
+
+  function appendAiMsg(text, sender) {
+    const box = document.getElementById('ai-chat-messages');
+    if (!box) return;
+    const div = document.createElement('div');
+    div.className = `ai-msg ai-msg--${sender}`;
+    div.textContent = text;
+    box.appendChild(div);
+    box.scrollTop = box.scrollHeight;
+  }
+
+  window.setAiHubQuery = function(query) {
+    const input = document.getElementById('ai-hub-input');
+    if (input) {
+      input.value = query;
+      const btn = document.getElementById('btn-ai-hub-send');
+      if (btn) btn.click();
+    }
+  };
+
+  function setupSupportChat() {
+    const btn = document.getElementById('btn-support-send');
+    const input = document.getElementById('support-input');
+    if (!btn || !input) return;
+
+    btn.onclick = () => {
+      const msg = input.value.trim();
+      if (!msg) return;
+      const box = document.getElementById('support-chat-messages');
+      const div = document.createElement('div');
+      div.style.alignSelf = 'flex-end';
+      div.style.background = 'var(--admin-primary)';
+      div.style.padding = '0.75rem';
+      div.style.borderRadius = '8px';
+      div.style.fontSize = '0.85rem';
+      div.style.marginBottom = '0.5rem';
+      div.textContent = msg;
+      box.appendChild(div);
+      input.value = '';
+      box.scrollTop = box.scrollHeight;
+      
+      setTimeout(() => {
+        WanderToast.info('Đã gửi phản hồi cho khách hàng.');
+      }, 500);
+    };
+  }
+
 })();

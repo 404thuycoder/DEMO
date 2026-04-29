@@ -41,6 +41,7 @@ const placeSchema = new mongoose.Schema({
   // Source info
   sourceName:    { type: String, default: '' },
   sourceUrl:     { type: String, default: '' },
+  videoUrl:      { type: String, default: '' }, // Thêm trường này
   transportTips: { type: String, default: '' },
 
   // Nested details (kept for backward compat)

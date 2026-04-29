@@ -3,7 +3,7 @@
  * Theme, Toast, Notifications, Rank Badges, Common Modals
  */
 
-window.WanderUI = (function () {
+window.WanderUI = Object.assign(window.WanderUI || {}, (function () {
   'use strict';
 
   const STORAGE_THEME = 'wander_theme';
@@ -155,18 +155,27 @@ window.WanderUI = (function () {
     if (!token) return;
     try {
       const res = await fetch('/api/notifications/unread-count', { headers: { 'x-auth-token': token } });
+      if (res.status === 401) {
+        // Silent fail for unauthorized
+        return;
+      }
       const json = await res.json();
       const badge = document.querySelector('[data-notif-badge]');
       if (badge) {
         if (json.count > 0) {
           badge.textContent = json.count > 20 ? '20+' : json.count;
           badge.style.display = 'flex';
+          badge.classList.add('pulse-notif');
         } else {
           badge.style.display = 'none';
         }
       }
     } catch (e) { }
   }
+
+  // Start polling
+  setInterval(updateNotificationBadge, 30000);
+  setTimeout(updateNotificationBadge, 2000);
 
   function toggleNotificationDrawer() {
     const drawer = document.getElementById('wander-notif-drawer') || createNotificationDrawer();
@@ -184,16 +193,67 @@ window.WanderUI = (function () {
   function createNotificationDrawer() {
     const drawer = document.createElement('div');
     drawer.id = 'wander-notif-drawer';
-    drawer.className = 'wander-notif-drawer';
+    drawer.className = 'wander-notif-drawer slide-drawer';
     drawer.innerHTML = `
       <div class="wander-notif-drawer__header">
         <h3>Thông báo</h3>
         <button class="wander-notif-drawer__close" onclick="WanderUI.toggleNotificationDrawer()">×</button>
       </div>
-      <div class="wander-notif-drawer__body" id="wander-notif-body"></div>
+      <div class="wander-notif-drawer__body" id="wander-notif-body">
+         <div class="notif-loading">Đang tải thông báo...</div>
+      </div>
+      <div class="wander-notif-drawer__footer">
+        <button onclick="WanderUI.markAllAsRead()" class="btn btn--ghost btn--small">Đánh dấu tất cả đã đọc</button>
+      </div>
     `;
     document.body.appendChild(drawer);
+    injectNotifStyles();
     return drawer;
+  }
+
+  function injectNotifStyles() {
+    if (document.getElementById('notif-styles')) return;
+    const style = document.createElement('style');
+    style.id = 'notif-styles';
+    style.textContent = `
+      .wander-notif-drawer {
+        position: fixed; top: 0; right: 0; bottom: 0; width: 380px; 
+        background: var(--bg-elevated); border-left: 1px solid var(--border);
+        z-index: 10000; display: none; flex-direction: column;
+        box-shadow: -10px 0 30px rgba(0,0,0,0.3); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        transform: translateX(100%);
+      }
+      .wander-notif-drawer.is-open { transform: translateX(0); }
+      .wander-notif-drawer__header { 
+        padding: 1.5rem; border-bottom: 1px solid var(--border);
+        display: flex; justify-content: space-between; align-items: center;
+      }
+      .wander-notif-drawer__body { flex: 1; overflow-y: auto; }
+      .wander-notif-drawer__footer { padding: 1rem; border-top: 1px solid var(--border); text-align: center; }
+      .wander-notif-item {
+        padding: 1.25rem 1.5rem; border-bottom: 1px solid rgba(255,255,255,0.03);
+        cursor: pointer; transition: background 0.2s; position: relative;
+      }
+      .wander-notif-item:hover { background: rgba(255,255,255,0.03); }
+      .wander-notif-item.is-unread { background: rgba(0, 240, 255, 0.03); }
+      .wander-notif-item.is-unread::before {
+        content: ''; position: absolute; left: 8px; top: 50%; transform: translateY(-50%);
+        width: 6px; height: 6px; background: var(--accent); border-radius: 50%;
+      }
+      .wander-notif-item__title { font-weight: 600; font-size: 0.95rem; margin-bottom: 4px; color: var(--text); }
+      .wander-notif-item__message { font-size: 0.88rem; color: var(--text-muted); line-height: 1.4; }
+      .wander-notif-item__time { font-size: 0.75rem; color: var(--text-muted); margin-top: 8px; opacity: 0.6; }
+      .pulse-notif { animation: pulse-ring 2s infinite; }
+      @keyframes pulse-ring { 0% { box-shadow: 0 0 0 0 rgba(0, 240, 255, 0.4); } 70% { box-shadow: 0 0 0 10px rgba(0, 240, 255, 0); } 100% { box-shadow: 0 0 0 0 rgba(0, 240, 255, 0); } }
+    `;
+    document.head.appendChild(style);
+  }
+
+  async function markAllAsRead() {
+     const token = localStorage.getItem('wander_token') || localStorage.getItem('wander_admin_token');
+     await fetch('/api/notifications/read-all', { method: 'POST', headers: { 'x-auth-token': token } });
+     renderNotifications();
+     updateNotificationBadge();
   }
 
   async function renderNotifications() {
@@ -291,7 +351,7 @@ window.WanderUI = (function () {
       authBtns.forEach(el => el.style.display = "none");
       profileTrays.forEach(el => { el.style.display = "flex"; el.removeAttribute('hidden'); });
 
-      const initialName = u.name || u.email || "User";
+      const initialName = u.displayName || u.name || "User";
       if (userNameEl) userNameEl.textContent = initialName;
       if (userInitial) {
         userInitial.textContent = initialName.charAt(0).toUpperCase();
@@ -299,32 +359,47 @@ window.WanderUI = (function () {
       }
       if (userAvatarImg) userAvatarImg.setAttribute('hidden', '');
 
-      // Standardize Dropdown Body: Only Profile, Stats, and Logout
+      // Standardize Dropdown Body
       const ddBody = document.querySelector('.user-dropdown__body');
       if (ddBody) {
         ddBody.innerHTML = `
-          <button type="button" class="user-dropdown__item" data-open-profile>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          <button type="button" class="user-dropdown-item" data-open-profile>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
             Hồ sơ của tôi
           </button>
-          <button type="button" class="user-dropdown__item" data-open-activity>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
-            Thống kê hoạt động
+          <button type="button" class="user-dropdown-item" data-open-activity>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            Hoạt động
           </button>
-          <div class="user-dropdown__divider"></div>
-          <button type="button" class="user-dropdown__item user-dropdown__item--danger" data-logout-btn>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          <div style="border-top:1px solid rgba(255,255,255,0.05); margin:0.5rem 0;"></div>
+          <button type="button" class="user-dropdown-item user-dropdown-item--danger" data-logout-btn>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
             Đăng xuất
           </button>
         `;
       }
 
       fetch('/api/auth/user/rank', { headers: { 'x-auth-token': token } })
-        .then(r => r.json())
+        .then(r => {
+          if (r.status === 401) {
+            // Token invalid or expired - clear it to avoid console spam
+            localStorage.removeItem('wander_token');
+            return null;
+          }
+          return r.json();
+        })
         .then(data => {
-          if (data.success) {
+          if (data && data.success) {
             const fullDis = data.displayName || data.name || initialName;
-            if (userNameEl) userNameEl.innerHTML = fullDis.replace(/</g, '&lt;') + '<span>' + (data.email || "").replace(/</g, '&lt;') + '</span>';
+            if (userNameEl) {
+               userNameEl.innerHTML = `
+                 <div style="display:flex; flex-direction:column; line-height:1.2;">
+                   <span style="font-weight:700; color:#fff; font-size:0.95rem;">${fullDis.replace(/</g, '&lt;')}</span>
+                   <span style="font-size:0.7rem; color:var(--text-muted); opacity:0.8;">${data.customId || ""}</span>
+                   <span style="font-size:0.7rem; color:var(--text-muted);">${(data.email || u.email || "").replace(/</g, '&lt;')}</span>
+                 </div>
+               `;
+            }
             if (userAvatarImg && data.avatar) {
               userAvatarImg.src = data.avatar;
               userAvatarImg.style.display = 'block';
@@ -333,45 +408,154 @@ window.WanderUI = (function () {
             }
             if (headerRankEl) {
               headerRankEl.innerHTML = getRankBadgeHTML(data.rank, data.rankTier);
-              const rankText = headerRankEl.querySelector('.rank-text');
-              if (rankText) { 
-                rankText.innerText = fullDis; 
-                rankText.style.fontSize = '0.9rem';
-                rankText.style.whiteSpace = 'nowrap';
-              }
-              const sprite = headerRankEl.querySelector('.rank-sprite');
-              if (sprite) {
-                sprite.style.transform = 'scale(0.45)';
-                sprite.style.margin = '-22px';
-              }
-              headerRankEl.style.display = 'inline-flex';
+              headerRankEl.style.display = 'flex';
               headerRankEl.style.alignItems = 'center';
             }
           }
-        }).catch(() => {});
+        }).catch(err => console.error("Auth sync API error:", err));
 
     } catch (e) { console.error("Auth sync error", e); }
-  }
-
-  function initNavigation() {
-    const page = window.location.pathname.split('/').pop() || 'index.html';
-    document.querySelectorAll('.nav-link').forEach(link => {
-      const href = link.getAttribute('href');
-      if (href === page || (page === 'index.html' && href === 'index.html')) link.classList.add('active');
-      else link.classList.remove('active');
+    
+    // Add event listeners for dynamic dropdown items
+    document.addEventListener('click', (e) => {
+      if (e.target.closest('[data-open-profile]')) {
+        window.location.href = 'profile.html';
+      }
+      if (e.target.closest('[data-logout-btn]')) {
+        WanderUI.forceLogout();
+      }
+      if (e.target.closest('[data-open-activity]')) {
+        WanderUI.openModal('activity-stats');
+      }
     });
   }
 
-  function injectCommonComponents() {
-    // 1. Sync Main Nav List (Horizontal)
-    const navList = document.querySelector('.nav-list');
-    if (navList && !navList.querySelector('[href="history.html"]')) {
-      const li = document.createElement('li');
-      li.innerHTML = `<a href="history.html" class="nav-link">🕒 Lịch sử</a>`;
-      const questsLink = navList.querySelector('[href="quests.html"]');
-      if (questsLink) navList.insertBefore(li, questsLink.parentNode);
-      else navList.appendChild(li);
+    const page = (window.location.pathname.split('/').pop() || 'index.html').toLowerCase();
+    const isExplorer = page === 'index.html' || page === '';
+    const isSocial = page.includes('social');
+    const isServices = page.includes('leaderboard') || page.includes('voucher') || page.includes('services');
+    const isQuests = page.includes('quests');
+    const isHistory = page.includes('history');
+
+    function injectHeader() {
+      const container = document.getElementById('header-container') || document.querySelector('[data-header]') || document.querySelector('.site-header') || document.querySelector('header');
+      if (!container) return;
+
+    container.innerHTML = `
+      <div class="header-inner">
+        <div class="header-left">
+          <a href="index.html" class="logo">
+            <span class="logo-mark">◈</span>
+            WanderViệt
+          </a>
+        </div>
+
+        <button type="button" class="nav-toggle" aria-expanded="false" aria-controls="site-nav" data-nav-toggle>
+          <span class="nav-toggle-bar"></span>
+          <span class="visually-hidden">Mở menu</span>
+        </button>
+        
+        <nav id="site-nav" class="site-nav" data-nav>
+          <ul class="nav-list">
+             <li><a href="index.html" class="nav-link" data-link="home">🏠 Home</a></li>
+             <li><a href="index.html#destinations" class="nav-link" data-link="destinations">📍 Điểm đến</a></li>
+             <li><a href="business-services.html" class="nav-link" data-link="business" style="color:var(--accent-warm);">🏨 Doanh nghiệp</a></li>
+             <li><a href="planner.html" class="nav-link" data-link="ai-planner">🤖 AI Trợ lý</a></li>
+             <li><a href="my-trips.html" class="nav-link" data-link="my-trips">📅 Chuyến đi</a></li>
+             <li><a href="social-hub.html" class="nav-link" data-link="social">👥 Social</a></li>
+             <li><a href="quests.html" class="nav-link" data-link="quests">🎯 Nhiệm vụ</a></li>
+             <li><a href="leaderboard.html" class="nav-link" data-link="leaderboard">🏆 BXH</a></li>
+          </ul>
+        </nav>
+
+        <div class="header-right">
+          <button type="button" class="btn-icon notif-btn-user" onclick="WanderUI.toggleNotificationDrawer()" aria-label="Thông báo">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+            <span class="notif-badge" data-notif-badge style="display:none;"></span>
+          </button>
+          
+          <button type="button" class="btn-icon" data-open-settings title="Cài đặt">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          </button>
+          
+          <div class="user-action-area" id="header-user-area">
+             <div class="user-tray" data-auth-show hidden>
+                <div class="user-rank-badge" id="header-user-rank"></div>
+                <div class="user-bubble" data-user-toggle>
+                   <span class="user-initial" data-user-initial>?</span>
+                   <img src="" alt="" class="user-avatar" data-user-avatar hidden />
+                </div>
+                <div class="user-dropdown" data-user-dropdown hidden>
+                   <div class="user-dropdown__head">
+                      <div class="user-dropdown__name" data-user-name>Tài khoản</div>
+                   </div>
+                   <div class="user-dropdown__body">
+                      <!-- Injected via syncAuthUI -->
+                   </div>
+                </div>
+             </div>
+             <button class="btn btn--primary login-btn" data-auth-open onclick="location.href='index.html#auth'">Đăng nhập</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function initNavigation() {
+    const navLinks = document.querySelectorAll('.nav-link');
+    const updateActive = () => {
+      const fullPath = (window.location.pathname.split('/').pop() || 'index.html').toLowerCase();
+      const hash = window.location.hash.toLowerCase();
+      
+      navLinks.forEach(link => {
+        const href = (link.getAttribute('href') || '').toLowerCase();
+        let isCurrent = false;
+        
+        if (href.includes('#')) {
+          const [hPage, hHash] = href.split('#');
+          // If on index.html and link is index.html#hash or just #hash
+          if ((fullPath === 'index.html' || fullPath === '') && (hPage === 'index.html' || hPage === '')) {
+             isCurrent = hash === ('#' + hHash);
+          }
+        } else {
+          isCurrent = (href === fullPath) || (fullPath === '' && href === 'index.html');
+          // Special case: if we have a hash on index.html, the 'Home' link (index.html) shouldn't be active
+          if (isCurrent && fullPath === 'index.html' && hash && href === 'index.html') {
+             isCurrent = false;
+          }
+        }
+        
+        if (isCurrent) link.classList.add('active');
+        else link.classList.remove('active');
+      });
+    };
+
+    updateActive();
+    window.addEventListener('hashchange', updateActive);
+    
+    // Mobile toggle
+    const toggle = document.querySelector('[data-nav-toggle]');
+    const nav = document.querySelector('[data-nav]');
+    const header = document.querySelector('.site-header');
+    
+    if (toggle && nav) {
+      toggle.onclick = (e) => {
+        e.preventDefault();
+        const isOpen = nav.classList.toggle('is-open');
+        if (header) header.classList.toggle('is-nav-open', isOpen);
+        toggle.setAttribute('aria-expanded', isOpen);
+      };
+      // Close on link click
+      navLinks.forEach(l => l.addEventListener('click', () => {
+         nav.classList.remove('is-open');
+         if (header) header.classList.remove('is-nav-open');
+         toggle.setAttribute('aria-expanded', 'false');
+      }));
     }
+  }
+
+  function injectCommonComponents() {
+    // 1. Navigation items are now handled by injectHeader()
 
     if (!document.querySelector('link[href*="companion.css"]')) {
       const link = document.createElement('link');
@@ -1672,6 +1856,7 @@ window.WanderUI = (function () {
   });
 
   // --- Init ---
+  injectHeader();
   injectCommonComponents();
   initNavigation();
   updateNotificationBadge();
@@ -1679,7 +1864,7 @@ window.WanderUI = (function () {
   initTheme();
   initGlobalChatbot();
 
-  return { setTheme, toggleTheme, showToast, setButtonLoading, toggleNotificationDrawer, updateNotificationBadge, markAsRead, showLeaderboard, getRankBadgeHTML, getRankIcon, syncAuthUI, forceLogout, openPlaceDetail, openItineraryDetail, toggleUserMenu };
-})();
+  return { setTheme, toggleTheme, showToast, setButtonLoading, toggleNotificationDrawer, updateNotificationBadge, markAsRead, markAllAsRead, showLeaderboard, getRankBadgeHTML, getRankIcon, syncAuthUI, forceLogout, openPlaceDetail, openItineraryDetail, toggleUserMenu };
+})());
 
 

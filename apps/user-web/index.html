@@ -24,81 +24,7 @@
 <body>
   <a class="skip-link" href="#main">Bỏ qua đến nội dung chính</a>
 
-  <header class="site-header" data-header>
-    <div class="container header-inner">
-      <!-- Logo -->
-      <a href="index.html" class="logo" aria-label="WanderViệt — Trang chủ">
-        <span class="logo-mark" aria-hidden="true">◈</span>
-        WanderViệt
-      </a>
-
-      <!-- Hamburger (mobile) -->
-      <button type="button" class="nav-toggle" aria-expanded="false" aria-controls="site-nav" data-nav-toggle>
-        <span class="nav-toggle-bar"></span>
-        <span class="visually-hidden">Mở menu</span>
-      </button>
-
-      <!-- Desktop Nav -->
-      <nav id="site-nav" class="site-nav" data-nav>
-        <ul class="nav-list">
-          <li><a href="index.html" class="nav-link active">🏠 Trang chủ</a></li>
-          <li><a href="index.html#destinations" class="nav-link">📍 Điểm du lịch</a></li>
-          <li><a href="planner.html" class="nav-link">✨ AI Trợ lý</a></li>
-          <li><a href="my-trips.html" class="nav-link">🎒 Chuyến đi</a></li>
-          <li><a href="history.html" class="nav-link">🕒 Lịch sử</a></li>
-          <li><a href="quests.html" class="nav-link">🎯 Nhiệm vụ</a></li>
-          <li><a href="leaderboard.html" class="nav-link">🏆 BXH</a></li>
-        </ul>
-      </nav>
-
-      <!-- Right Actions -->
-      <div class="header-actions">
-        <!-- Notification Bell -->
-        <button type="button" class="btn-icon notif-btn-user" onclick="WanderUI.toggleNotificationDrawer()" aria-label="Thông báo">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-          <span class="wander-notif-badge" data-notif-badge></span>
-        </button>
-
-        <!-- Settings -->
-        <button type="button" class="btn-icon" data-open-settings title="Cài đặt">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-        </button>
-
-        <!-- Auth -->
-        <button type="button" class="btn btn--sm btn--primary" data-auth-open data-auth-hide>Tham gia</button>
-
-        <!-- User Avatar + Dropdown (authenticated) -->
-        <div class="user-bubble" data-user-bubble data-auth-show style="display:none">
-          <span id="header-user-rank" style="font-size:0.75rem;font-weight:700;margin-right:4px;opacity:0.9;"></span>
-          <button type="button" class="user-bubble__btn" data-user-toggle aria-expanded="false" aria-haspopup="true" aria-label="Menu tài khoản">
-            <img src="" alt="Avatar" class="user-avatar-img" data-user-avatar hidden />
-            <span class="user-bubble__initial" data-user-initial>?</span>
-          </button>
-          <div class="user-dropdown" data-user-dropdown hidden>
-            <div class="user-dropdown__header">
-              <p class="user-dropdown__name" data-user-name></p>
-            </div>
-            <div class="user-dropdown__body">
-              <button type="button" class="user-dropdown__item" data-open-profile>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-                Hồ sơ của tôi
-              </button>
-              <button type="button" class="user-dropdown__item" data-open-activity>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg>
-                Thống kê hoạt động
-              </button>
-              
-              <div class="user-dropdown__divider"></div>
-              <button type="button" class="user-dropdown__item user-dropdown__item--danger" data-logout>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-                Đăng xuất
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </header>
+  <header class="site-header" id="header-container"></header>
 
   <main id="main">
     <section class="hero-v2" style="background-image: url('https://images.unsplash.com/photo-1528127269322-539801943592?q=80&w=2000'); background-size: cover; background-position: center;">
@@ -248,12 +174,28 @@
       </div>
     </section>
 
+    <!-- Business Services Section -->
+    <section id="business-services" class="section" style="background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);">
+      <div class="container">
+        <div class="section-header" style="text-align: center; margin-bottom: 3rem;">
+          <h2 class="section-title" style="color: var(--accent-primary);">🏨 Dịch vụ từ Đối tác</h2>
+          <p class="section-desc">Khám phá các tour du lịch và dịch vụ cao cấp từ cộng đồng doanh nghiệp WanderViệt.</p>
+        </div>
+        <div class="dest-grid" id="biz-services-grid">
+          <!-- Will be populated by JS -->
+          <div style="grid-column: 1/-1; padding: 4rem; text-align: center; color: #64748b; background: white; border-radius: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.05);">
+            <div class="spinner" style="margin: 0 auto 1rem;"></div>
+            <p>Đang kết nối với các đối tác du lịch...</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <section id="smart-search" class="section smart-search" aria-labelledby="smart-title">
       <div class="container">
         <header class="section-head">
           <h2 id="smart-title" class="section-title">Tìm điểm đến theo bạn</h2>
-          <p class="section-desc">Lọc theo ngân sách, nhịp chuyến đi, sở thích và thói quen sinh hoạt — danh sách xếp
-            theo độ phù hợp.</p>
+          <p class="section-desc">Lọc theo ngân sách, nhịp chuyến đi, sở thích và thói quen sinh hoạt. Hoặc sử dụng <a href="planner.html" style="color: var(--accent); font-weight: 700; text-decoration: underline;">AI Trợ lý</a> để thiết kế lịch trình riêng cho bạn!</p>
         </header>
         <form class="smart-form" data-smart-form>
           <div class="smart-grid">
@@ -576,6 +518,40 @@
       </div>
     </div>
   </div>
+
+    <!-- Booking Modal -->
+    <div data-modal="booking" class="modal" hidden>
+      <div class="modal__inner" style="max-width: 450px; background: #fff; border-radius: 20px; overflow: hidden; box-shadow: 0 20px 50px rgba(0,0,0,0.2);">
+        <div style="padding: 2rem;">
+          <button class="modal__close" data-modal-close style="position: absolute; top: 1rem; right: 1rem; font-size: 1.5rem;">×</button>
+          <div class="booking-form-wrap">
+            <h3 style="margin-bottom: 0.5rem; color: var(--accent-primary);">📅 Đặt dịch vụ</h3>
+            <p id="booking-place-name" style="font-weight: 600; margin-bottom: 1.5rem; color: #444;"></p>
+            
+            <form id="booking-form">
+              <input type="hidden" id="booking-place-id">
+              <div class="form-group" style="margin-bottom: 1rem;">
+                <label style="display: block; font-size: 0.9rem; margin-bottom: 0.4rem; font-weight: 600;">Ngày sử dụng</label>
+                <input type="date" id="booking-date" required class="form-control" style="width: 100%; padding: 0.8rem; border-radius: 8px; border: 1.5px solid #eee; font-family: inherit;">
+              </div>
+              <div class="form-group" style="margin-bottom: 1rem;">
+                <label style="display: block; font-size: 0.9rem; margin-bottom: 0.4rem; font-weight: 600;">Số lượng khách</label>
+                <input type="number" id="booking-people" value="1" min="1" required class="form-control" style="width: 100%; padding: 0.8rem; border-radius: 8px; border: 1.5px solid #eee; font-family: inherit;">
+              </div>
+              <div class="form-group" style="margin-bottom: 1rem;">
+                <label style="display: block; font-size: 0.9rem; margin-bottom: 0.4rem; font-weight: 600;">Tên người đặt</label>
+                <input type="text" id="booking-customer-name" required class="form-control" style="width: 100%; padding: 0.8rem; border-radius: 8px; border: 1.5px solid #eee; font-family: inherit;" placeholder="Nguyễn Văn A">
+              </div>
+              <div class="form-group" style="margin-bottom: 1.5rem;">
+                <label style="display: block; font-size: 0.9rem; margin-bottom: 0.4rem; font-weight: 600;">Số điện thoại</label>
+                <input type="tel" id="booking-phone" required class="form-control" style="width: 100%; padding: 0.8rem; border-radius: 8px; border: 1.5px solid #eee; font-family: inherit;" placeholder="09xx xxx xxx">
+              </div>
+              <button type="submit" class="btn btn--primary btn--block" style="padding: 1rem; font-weight: 700; font-size: 1rem; letter-spacing: 0.5px;">GỬI YÊU CẦU ĐẶT CHỖ</button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
 
   <!-- Unified Global Chatbot will be injected here by SharedUI.js?v=1777307000000 -->
 

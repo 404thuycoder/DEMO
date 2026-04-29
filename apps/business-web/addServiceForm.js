@@ -268,37 +268,95 @@ function initAddServiceForm(rootId = 'modal-root', triggerSelector = '.btn-add')
               <div class="svc-form-group">
                 <label class="svc-form-label">Loại dịch vụ *</label>
                 <select id="svc-input-type" class="svc-form-input" required>
-                  <option value="khách sạn">Khách sạn</option>
-                  <option value="tour">Tour du lịch</option>
-                  <option value="nhà hàng">Nhà hàng</option>
-                  <option value="villa">Villa / Resort</option>
+                  <option value="diem-du-lich">Điểm du lịch</option>
+                  <option value="tien-ich">Tiện ích / Khách sạn</option>
                 </select>
               </div>
               <div class="svc-form-group">
-                <label class="svc-form-label">Giá (VND) *</label>
+                <label class="svc-form-label">Giá thấp nhất (VND) *</label>
                 <input type="number" id="svc-input-price" class="svc-form-input" placeholder="VD: 1500000" min="0" required>
               </div>
             </div>
             
             <div class="svc-form-group">
-              <label class="svc-form-label">Địa điểm *</label>
+              <label class="svc-form-label">Địa điểm / Khu vực *</label>
               <input type="text" id="svc-input-loc" class="svc-form-input" placeholder="VD: Hạ Long, Quảng Ninh" required>
+            </div>
+
+            <div class="svc-form-group">
+              <label class="svc-form-label">Mô tả tổng quan</label>
+              <textarea id="svc-input-desc" class="svc-form-input" style="height:80px;" placeholder="Giới thiệu ngắn về dịch vụ của bạn..."></textarea>
             </div>
             
             <div class="svc-form-group">
-              <label class="svc-form-label">URL Ảnh (Tuỳ chọn)</label>
-              <input type="url" id="svc-input-img" class="svc-form-input" placeholder="https://...">
+              <label class="svc-form-label">Danh sách Ảnh (URLs, ngăn cách bằng dấu phẩy)</label>
+              <textarea id="svc-input-imgs" class="svc-form-input" placeholder="https://image1.jpg, https://image2.jpg..."></textarea>
+            </div>
+
+            <div class="svc-form-group">
+              <label class="svc-form-label">Link Video giới thiệu (Youtube/TikTok)</label>
+              <input type="url" id="svc-input-video" class="svc-form-input" placeholder="https://www.youtube.com/watch?v=...">
             </div>
           </div>
           
           <div class="svc-modal-footer">
             <button type="button" class="svc-btn svc-btn-cancel" id="add-svc-cancel">Hủy</button>
-            <button type="submit" class="svc-btn svc-btn-submit">Thêm dịch vụ</button>
+            <button type="submit" class="svc-btn svc-btn-submit" id="add-svc-submit-btn">Đăng dịch vụ</button>
           </div>
         </form>
       </div>
     </div>
   `;
+  
+  // -- REPLACEMENT FOR addService FUNCTION --
+  window.addService = async function(service) {
+    const btn = document.getElementById('add-svc-submit-btn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Đang đăng...'; }
+
+    try {
+      const token = localStorage.getItem('biz_auth_token') || 
+                    sessionStorage.getItem('biz_auth_token') ||
+                    localStorage.getItem('wander_business_token') || 
+                    sessionStorage.getItem('wander_business_token') ||
+                    localStorage.getItem('wander_token');
+
+      const res = await fetch('/api/business/places', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'x-auth-token': token
+        },
+        body: JSON.stringify({
+          name: service.name,
+          kind: service.type,
+          priceFrom: service.price,
+          region: service.location,
+          description: service.description,
+          images: service.images,
+          videoUrl: service.videoUrl
+        })
+      });
+      
+      const data = await res.json();
+      if (data.success) {
+        alert('Dịch vụ đã được gửi lên hệ thống và đang chờ phê duyệt!');
+        location.reload(); 
+      } else {
+        // Nếu lỗi Auth, yêu cầu đăng nhập lại
+        if (data.message && (data.message.includes('Auth') || data.message.includes('JWT'))) {
+           alert('Phiên làm việc đã hết hạn hoặc không hợp lệ. Vui lòng đăng nhập lại.');
+           window.bizLogout(); // Hàm đã có trong biz-extend.js
+           return;
+        }
+        alert('Lỗi: ' + data.message);
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Không thể kết nối đến máy chủ.');
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = 'Đăng dịch vụ'; }
+    }
+  };
   
   // Element references
   const overlay = document.getElementById('add-svc-overlay');
@@ -332,19 +390,18 @@ function initAddServiceForm(rootId = 'modal-root', triggerSelector = '.btn-add')
   form.addEventListener('submit', (e) => {
     e.preventDefault();
     
-    // Lấy data từ form
+    // Lấy data từ form mới
     const serviceData = {
       name: document.getElementById('svc-input-name').value,
       type: document.getElementById('svc-input-type').value,
       price: document.getElementById('svc-input-price').value,
       location: document.getElementById('svc-input-loc').value,
-      image: document.getElementById('svc-input-img').value
+      description: document.getElementById('svc-input-desc').value,
+      videoUrl: document.getElementById('svc-input-video').value,
+      images: document.getElementById('svc-input-imgs').value.split(',').map(s => s.trim()).filter(Boolean)
     };
     
-    // Gọi hàm Core
-    addService(serviceData);
-    
-    // Đóng và reset form
-    closeModal();
+    // Gọi hàm Core (đã được window-scoped ở trên)
+    window.addService(serviceData);
   });
 }

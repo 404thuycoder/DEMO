@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 
 const adminAccountSchema = new mongoose.Schema({
+  customId: { type: String, unique: true, sparse: true, index: true },
   name: { type: String, required: true },
   displayName: { type: String, default: '' },
   email: { type: String, required: true, unique: true },

@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Place = require('../models/Place');
 const Feedback = require('../models/Feedback');
-const { businessAuth } = require('./auth');
+const { businessAuth, generateCustomId } = require('./auth');
 const upload = require('../middlewares/upload');
 const logAction = require('../utils/logger');
 const BusinessAccount = require('../models/BusinessAccount');
@@ -150,6 +150,7 @@ router.post('/places', businessAuth, upload.array('imageFile', 10), async (req, 
     const tagsArr = safeParseArray(req, 'tags');
 
     const newPlace = new Place({
+      id: generateCustomId(req.body.kind),
       name: req.body.name,
       kind: req.body.kind,
       region: req.body.region,
@@ -167,6 +168,7 @@ router.post('/places', businessAuth, upload.array('imageFile', 10), async (req, 
       contactPhone: req.body.contactPhone,
       contactEmail: req.body.contactEmail,
       website: req.body.website,
+      videoUrl: req.body.videoUrl, // Thêm dòng này
       lat: req.body.lat,
       lng: req.body.lng,
       id: 'biz-' + Date.now(),

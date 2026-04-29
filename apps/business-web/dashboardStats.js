@@ -41,7 +41,8 @@ function calculateStats() {
     totalServices,
     totalBookings,
     totalRevenue,
-    avgRating: avgRating.toFixed(1)
+    avgRating: avgRating.toFixed(1),
+    ratedServicesCount: ratedServices.length
   };
 }
 
@@ -97,7 +98,7 @@ function renderStats(containerId = 'dashboard-stats') {
         <div class="stat-num" id="stat-val-rating">
           ${stats.avgRating}<span style="font-size:15px;font-weight:500">/5</span>
         </div>
-        <div class="stat-trend">Từ ${services.filter(s => s.rating > 0).length} dịch vụ</div>
+        <div class="stat-trend">Từ ${stats.ratedServicesCount} dịch vụ</div>
       </div>
     </div>
   `;

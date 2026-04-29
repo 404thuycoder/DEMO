@@ -9,6 +9,8 @@ const EMPTY_FORM = {
   address: '',
   description: '',
   image: '',
+  images: [], // Thêm mảng ảnh
+  videoUrl: '', // Thêm video
   priceFrom: '',
   priceTo: '',
   openTime: '',
@@ -45,7 +47,7 @@ export default function BusinessDashboard() {
   }, []);
 
   const checkAuth = async () => {
-    const token = localStorage.getItem('biz_token') || sessionStorage.getItem('biz_token');
+    const token = localStorage.getItem('biz_token') || sessionStorage.getItem('biz_token') || localStorage.getItem('wander_token');
     if (!token) {
       setAuthLoading(false);
       return;
@@ -57,7 +59,6 @@ export default function BusinessDashboard() {
         fetchData(token);
       } else {
         localStorage.removeItem('biz_token');
-        sessionStorage.removeItem('biz_token');
       }
     } catch (err) {
       console.error('Lỗi xác thực', err);
@@ -83,13 +84,13 @@ export default function BusinessDashboard() {
 
   const handleLoginSuccess = (userData) => {
     setUser(userData);
-    const token = localStorage.getItem('biz_token') || sessionStorage.getItem('biz_token');
+    const token = localStorage.getItem('biz_token') || sessionStorage.getItem('biz_token') || localStorage.getItem('wander_token');
     fetchData(token);
   };
 
   const handleLogout = () => {
     localStorage.removeItem('biz_token');
-    sessionStorage.removeItem('biz_token');
+    localStorage.removeItem('wander_token');
     setUser(null);
     setServices([]);
   };
@@ -99,8 +100,8 @@ export default function BusinessDashboard() {
     if (!keyword) return services;
     return services.filter((item) => {
       const hitName = item.name.toLowerCase().includes(keyword);
-      const hitCategory = item.category.toLowerCase().includes(keyword);
-      const hitRegion = item.region.toLowerCase().includes(keyword);
+      const hitCategory = (item.kind || item.category || '').toLowerCase().includes(keyword);
+      const hitRegion = (item.region || '').toLowerCase().includes(keyword);
       return hitName || hitCategory || hitRegion;
     });
   }, [query, services]);
@@ -121,7 +122,7 @@ export default function BusinessDashboard() {
     setFormData({
       ...EMPTY_FORM,
       ...item,
-      // Đảm bảo tiện ích luôn là mảng
+      category: item.kind || item.category,
       amenities: Array.isArray(item.amenities) ? item.amenities : []
     });
     setIsModalOpen(true);
@@ -155,10 +156,16 @@ export default function BusinessDashboard() {
   const onSubmit = async (event) => {
     event.preventDefault();
     setIsSubmitting(true);
-    const token = localStorage.getItem('biz_token') || sessionStorage.getItem('biz_token');
+    const token = localStorage.getItem('biz_token') || sessionStorage.getItem('biz_token') || localStorage.getItem('wander_token');
     try {
       const url = editingService ? `/api/business/places/${editingService.id}` : '/api/business/places';
       const method = editingService ? 'PUT' : 'POST';
+
+      // Parse images array if string
+      let finalImages = formData.images;
+      if (typeof finalImages === 'string') {
+        finalImages = finalImages.split(',').map(s => s.trim()).filter(Boolean);
+      }
 
       const res = await fetch(url, {
         method,
@@ -166,10 +173,10 @@ export default function BusinessDashboard() {
           'Content-Type': 'application/json',
           'x-auth-token': token 
         },
-        // Thêm amenities dạng mảng hoặc json string
         body: JSON.stringify({
           ...formData,
-          amenities: JSON.stringify(formData.amenities)
+          kind: formData.category,
+          images: finalImages
         })
       });
       
@@ -193,7 +200,7 @@ export default function BusinessDashboard() {
 
   const onDelete = async (id) => {
     if (!window.confirm('Bạn có chắc muốn xóa dịch vụ này?')) return;
-    const token = localStorage.getItem('biz_token') || sessionStorage.getItem('biz_token');
+    const token = localStorage.getItem('biz_token') || sessionStorage.getItem('biz_token') || localStorage.getItem('wander_token');
     try {
       const res = await fetch(`/api/business/places/${id}`, {
         method: 'DELETE',
@@ -268,7 +275,7 @@ export default function BusinessDashboard() {
               <div className="biz-stats-row">
                 <div className="stat-card"><div className="stat-label">Tổng dịch vụ</div><div className="stat-val">{stats.totalServices}</div></div>
                 <div className="stat-card"><div className="stat-label">Đang hiển thị</div><div className="stat-val">{approvedServices.length}</div></div>
-                <div className="stat-card"><div className="stat-label">Tổng lượt xem</div><div className="stat-val">{stats.totalViews?.toLocaleString('vi-VN')}</div></div>
+                <div className="stat-card"><div className="stat-label">Tổng lượt xem / thích</div><div className="stat-val">❤️ {stats.totalViews?.toLocaleString('vi-VN')}</div></div>
                 <div className="stat-card"><div className="stat-label">Đánh giá TB</div><div className="stat-val">⭐ {stats.avgRating || '0.0'}</div></div>
               </div>
               <div className="biz-panel">
@@ -311,14 +318,14 @@ export default function BusinessDashboard() {
                       <tr key={item.id}>
                         <td>
                           <div className="service-name-cell">
-                            <img className="service-thumb" src={item.image || 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=600'} alt={item.name} />
+                            <img className="service-thumb" src={item.image || (item.images && item.images[0]) || 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=600'} alt={item.name} />
                             <div>
                               <strong>{item.name}</strong>
                               <small className="service-address">{item.region} - {item.address}</small>
                             </div>
                           </div>
                         </td>
-                        <td><span className="biz-tag">{item.category}</span></td>
+                        <td><span className="biz-tag">{item.kind || item.category}</span></td>
                         <td>{formatVnd(item.priceFrom)}</td>
                         <td>
                           <span className={`status-badge status-badge--${item.status}`}>
@@ -355,7 +362,7 @@ export default function BusinessDashboard() {
               <div className="tour-grid">
                 {approvedServices.map((item) => (
                   <article className="travel-card" key={item.id}>
-                    <img className="travel-card-img" src={item.image || 'https://images.unsplash.com/photo-1528127269322-539801943592?w=1200'} alt={item.name} />
+                    <img className="travel-card-img" src={item.image || (item.images && item.images[0]) || 'https://images.unsplash.com/photo-1528127269322-539801943592?w=1200'} alt={item.name} />
                     <div className="travel-card-overlay">
                       <h3 className="travel-card-title">{item.name}</h3>
                       <p style={{ margin: '0.35rem 0', fontSize: '0.85rem', color: '#cbd5e1' }}>{item.description}</p>
@@ -379,7 +386,7 @@ export default function BusinessDashboard() {
       {isModalOpen && <div className="biz-modal-overlay" onClick={() => setIsModalOpen(false)} />}
       {isModalOpen && (
         <div className="biz-modal-overlay" style={{ alignItems: 'flex-start', paddingTop: '2rem' }}>
-          <div className="biz-modal-content">
+          <div className="biz-modal-content" style={{ maxWidth: '800px' }}>
             <div className="biz-modal-header" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1.5rem', borderBottom: '1px solid var(--biz-border)', paddingBottom: '1rem' }}>
               <h3 style={{ margin: 0, fontSize: '1.4rem' }}>{editingService ? 'Cập nhật dịch vụ' : 'Đăng tải dịch vụ mới'}</h3>
               <button className="btn-modal-close" onClick={() => setIsModalOpen(false)} style={{ background: 'transparent', border: 'none', color: 'white', fontSize: '1.5rem', cursor: 'pointer' }}>×</button>
@@ -420,6 +427,24 @@ export default function BusinessDashboard() {
                   <div className="field"><label>Giá từ (VND) *</label><input required name="priceFrom" type="number" value={formData.priceFrom} onChange={onFieldChange} /></div>
                   <div className="field"><label>Giá đến (VND)</label><input name="priceTo" type="number" value={formData.priceTo} onChange={onFieldChange} /></div>
                 </div>
+                
+                <div className="field">
+                  <label>Video giới thiệu (Youtube/TikTok URL)</label>
+                  <input name="videoUrl" value={formData.videoUrl} onChange={onFieldChange} placeholder="https://..." />
+                </div>
+
+                <div className="field">
+                  <label>Danh sách nhiều ảnh (URLs, ngăn cách bằng dấu phẩy)</label>
+                  <textarea 
+                    name="images" 
+                    value={Array.isArray(formData.images) ? formData.images.join(', ') : formData.images} 
+                    onChange={onFieldChange} 
+                    placeholder="URL1, URL2, URL3..."
+                    rows="2"
+                    style={{ width: '100%', background: 'var(--biz-surface-light)', color: 'white', border: '1px solid var(--biz-border)', borderRadius: '12px', padding: '0.8rem 1rem', boxSizing: 'border-box' }}
+                  />
+                </div>
+
                 <div className="field-row three-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
                   <div className="field"><label>Giờ mở</label><input name="openTime" type="time" value={formData.openTime} onChange={onFieldChange} /></div>
                   <div className="field"><label>Giờ đóng</label><input name="closeTime" type="time" value={formData.closeTime} onChange={onFieldChange} /></div>
@@ -457,8 +482,7 @@ export default function BusinessDashboard() {
                 </div>
 
                 <div className="field">
-                  <label>Ảnh đại diện (URL hoặc tải lên)</label>
-                  <input type="text" name="image" placeholder="URL ảnh..." value={formData.image} onChange={onFieldChange} style={{ marginBottom: '0.5rem' }} />
+                  <label>Ảnh đại diện (Tải lên file)</label>
                   <input type="file" accept="image/*" onChange={onImageChange} style={{ padding: '0.5rem' }} />
                   {formData.image && <img className="image-preview" src={formData.image} alt="preview" style={{ marginTop: '1rem', width: '200px', borderRadius: '12px', objectFit: 'cover' }} />}
                 </div>

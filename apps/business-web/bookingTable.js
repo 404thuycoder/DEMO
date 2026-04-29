@@ -198,13 +198,18 @@ function renderBookings(bookings, containerId = 'booking-table', options = {}) {
             <td class="booking-id">${b.id}</td>
             <td class="booking-name">${b.customerName}</td>
             <td class="booking-svc" title="${b.serviceName}">${b.serviceName}</td>
-            <td class="booking-date">${b.bookingDate}</td>
             <td class="booking-date">${b.useDate}</td>
             <td class="booking-val">${fmt.format(b.value)} <span style="font-weight:400;color:#aaa;font-size:11px">VND</span></td>
             <td>
               <span class="bk-status ${st.cls}">
                 <span class="bk-dot"></span>${st.label}
               </span>
+            </td>
+            <td class="booking-actions">
+              ${b.status === 'pending' ? `
+                <button class="btn-action-mini btn-approve" onclick="updateBookingStatus('${b.rawId}', 'confirmed')" title="Duyệt đơn">✅</button>
+                <button class="btn-action-mini btn-reject" onclick="updateBookingStatus('${b.rawId}', 'cancelled')" title="Từ chối">❌</button>
+              ` : '<span style="color:#aaa;font-size:12px">Xong</span>'}
             </td>
           </tr>`;
       }).join('');
@@ -223,10 +228,10 @@ function renderBookings(bookings, containerId = 'booking-table', options = {}) {
               <th>Mã đơn</th>
               <th>Khách hàng</th>
               <th>Dịch vụ</th>
-              <th>Ngày đặt</th>
               <th>Ngày sử dụng</th>
               <th>Giá trị</th>
               <th>Trạng thái</th>
+              <th>Thao tác</th>
             </tr>
           </thead>
           <tbody>${rows}</tbody>

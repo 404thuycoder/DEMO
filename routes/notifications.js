@@ -16,11 +16,14 @@ const roleAuth = (roles) => (req, res, next) => {
 // GET /api/notifications - Get current user notifications
 router.get('/', sharedAuth, async (req, res) => {
   try {
+    const userId = req.user ? req.user.id : null;
+    const userRole = (req.user && req.user.role ? req.user.role : 'user').toUpperCase();
+
     const notifications = await Notification.find({
       $or: [
-        { recipientId: req.user.id },
+        { recipientId: userId },
         { recipientId: 'ALL' },
-        { recipientId: `ROLE_${req.user.role.toUpperCase()}` }
+        { recipientId: `ROLE_${userRole}` }
       ]
     })
     .sort({ createdAt: -1 })
@@ -35,17 +38,34 @@ router.get('/', sharedAuth, async (req, res) => {
 // GET /api/notifications/unread-count
 router.get('/unread-count', sharedAuth, async (req, res) => {
   try {
-    const count = await Notification.countDocuments({
+    const userId = req.user ? req.user.id : null;
+    const userRole = (req.user && req.user.role ? req.user.role : 'user').toUpperCase();
+
+    // Debug log (internal)
+    // console.log('Fetching unread for:', { userId, userRole });
+
+    const query = {
       $or: [
-        { recipientId: req.user.id },
         { recipientId: 'ALL' },
-        { recipientId: `ROLE_${req.user.role.toUpperCase()}` }
+        { recipientId: `ROLE_${userRole}` }
       ],
       isRead: false
-    });
+    };
+    
+    if (userId) {
+      query.$or.push({ recipientId: userId });
+    }
+
+    const count = await Notification.countDocuments(query);
     res.json({ success: true, count });
   } catch (err) {
-    res.status(500).json({ success: false, message: 'Server error' });
+    console.error('Notification unread-count error:', err);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Server error', 
+      debug: err.message,
+      stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+    });
   }
 });
 

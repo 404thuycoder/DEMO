@@ -1,4 +1,4 @@
-const __oldLog = console.log; console.log = () => {}; require('dotenv').config(); console.log = __oldLog;
+require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
@@ -42,7 +42,9 @@ app.use('/api/directions', require('./routes/directions'));
 app.use('/api/navi', require('./routes/ai-navigation'));
 app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/knowledge', require('./routes/knowledge'));
+app.use('/api/social', require('./routes/social'));
 app.use('/api/public', require('./routes/public'));
+app.use('/api/bookings', require('./routes/bookings'));
 
 // Static User Web
 app.use(express.static(path.join(__dirname, 'apps/user-web')));

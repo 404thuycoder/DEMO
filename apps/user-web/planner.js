@@ -365,29 +365,32 @@ document.addEventListener('DOMContentLoaded', function () {
     const html = `
       <div class="timeline-header">
         <h2 class="activity-title" style="font-size: 1.5rem;">Hành trình: ${dest}</h2>
-        <p class="timeline-summary">${plan.summary || ''}</p>
+        <p class="timeline-summary">${plan.tripSummary || plan.summary || ''}</p>
         <div class="timeline-meta">
           <div class="meta-card"><div class="meta-icon-wrapper">📅</div><div class="meta-content"><p>THỜI GIAN</p><h4>${days} Ngày</h4></div></div>
-          <div class="meta-card"><div class="meta-icon-wrapper">💰</div><div class="meta-content"><p>DỰ KIẾN</p><h4>${plan.totalEstimatedCost || '---'}</h4></div></div>
+          <div class="meta-card"><div class="meta-icon-wrapper">💰</div><div class="meta-content"><p>DỰ KIẾN</p><h4>${plan.estimatedCost || plan.totalEstimatedCost || '---'}</h4></div></div>
         </div>
       </div>
       <div class="timeline-body">
-        ${(plan.itinerary || []).map(day => `
+        ${(plan.itinerary || []).map(day => {
+          const dayNum = (day.day || '').toString();
+          return `
           <div class="timeline-day">
-            <div class="day-badge">Ngày ${day.day}: ${day.title || ''}</div>
+            <div class="day-badge">Ngày ${dayNum}</div>
             <div class="day-activities">
               ${(day.activities || []).map(act => `
                 <div class="activity-card">
                   <div class="activity-time">${act.time || '--:--'}</div>
-                  <h4 class="activity-title">${act.activity}</h4>
+                  <h4 class="activity-title">${act.task || act.activity || act.name || ''}</h4>
                   <p class="activity-location">📍 ${act.location || 'Địa điểm chưa rõ'}</p>
-                  <p class="activity-details">${act.description || ''}</p>
+                  <p class="activity-details">${act.description || act.desc || ''}</p>
                   <div class="activity-cost">Dự kiến: ${act.cost || 'Miễn phí'}</div>
                 </div>
               `).join('')}
             </div>
           </div>
-        `).join('')}
+          `;
+        }).join('')}
       </div>
     `;
     document.getElementById('timelineContent').innerHTML = html;
@@ -426,5 +429,41 @@ document.addEventListener('DOMContentLoaded', function () {
       }
     } catch(err) { console.error(err); }
     finally { loader.style.display = 'none'; }
+  });
+
+  btnSaveTrip?.addEventListener('click', async () => {
+    if (!currentItineraryId) return;
+    const token = localStorage.getItem('wander_token');
+    if (!token) {
+      alert("Vui lòng đăng nhập để lưu lịch trình.");
+      if (window.WanderUI && WanderUI.openModal) WanderUI.openModal('auth');
+      return;
+    }
+    btnSaveTrip.disabled = true;
+    btnSaveTrip.textContent = "Đang lưu...";
+    try {
+      const res = await fetch('/api/planner/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-auth-token': token },
+        body: JSON.stringify({ itineraryId: currentItineraryId })
+      });
+      const data = await res.json();
+      if (data.success) {
+        btnSaveTrip.textContent = "✓ Đã lưu thành công";
+        btnSaveTrip.style.background = "#10b981";
+        const statusEl = document.getElementById('saveTripStatus');
+        if (statusEl) {
+          statusEl.style.display = 'block';
+          statusEl.textContent = "Lịch trình đã được thêm vào Chuyến đi của bạn.";
+        }
+      } else {
+        btnSaveTrip.disabled = false;
+        btnSaveTrip.textContent = "Thử lại";
+      }
+    } catch(e) { 
+      console.error(e);
+      btnSaveTrip.disabled = false;
+      btnSaveTrip.textContent = "Lỗi lưu";
+    }
   });
 });

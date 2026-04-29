@@ -104,7 +104,10 @@ document.addEventListener('DOMContentLoaded', function () {
     if (userProfile) {
       userProfile.innerHTML = `
         <img src="${user.avatar || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(displayName) + '&background=0284c7&color=fff'}" alt="Partner" class="biz-user-avatar" />
-        <span class="biz-user-name">${escHtml(displayName)}</span>
+        <div style="display:flex; flex-direction:column">
+          <span class="biz-user-name">${escHtml(displayName)}</span>
+          <span style="font-size:0.7rem; color:rgba(255,255,255,0.5)">ID: ${user.customId || 'business'}</span>
+        </div>
       `;
     }
 

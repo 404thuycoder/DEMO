@@ -160,43 +160,47 @@ router.post('/', optionalAuth, async (req, res) => {
     }
     // --- END SMART CACHE ---
 
-    // 3. Khởi tạo System Prompt chuyên biệt theo vai trò
+    // 3. Khởi tạo System Prompt chuyên biệt theo vai trò và BỐI CẢNH TRANG (SCOPE)
     let systemPrompt = "";
     const userRole = role || (req.user ? req.user.role : 'user');
+    const scope = req.body.scope || 'user_portal'; // Mặc định là trang người dùng
 
-    if (userRole === 'admin' || userRole === 'superadmin') {
+    if (scope === 'admin_portal') {
       systemPrompt = `
-BẠN LÀ: Trợ lý Quản trị hệ thống WanderViệt.
-NHIỆM VỤ: Hỗ trợ Admin kiểm tra logs, giải thích các quy trình kiểm duyệt, thống kê và quản lý toàn hệ thống.
-PHONG CÁCH: Chuyên nghiệp, chính xác, tập trung vào dữ liệu và bảo mật.
+BẠN LÀ: Trợ lý Quản trị cao cấp WanderViệt (Admin Portal).
+NHIỆM VỤ: Chỉ hỗ trợ về quản lý hệ thống, kiểm duyệt dịch vụ, báo cáo doanh thu và kỹ thuật.
+CẢNH BÁO: TUYỆT ĐỐI KHÔNG trả lời các câu hỏi về du lịch hay tư vấn tour ở đây.
 `;
-    } else if (userRole === 'business') {
+    } else if (scope === 'business_portal') {
       systemPrompt = `
-BẠN LÀ: Chuyên gia Trợ lý ảo AI cao cấp dành riêng cho Đối tác Doanh nghiệp trên nền tảng WanderViệt.
-TÊN CỦA BẠN: WanderViệt Business Assistant.
-NHIỆM VỤ CỐT LÕI: 
-- Hỗ trợ doanh nghiệp tối ưu hóa dịch vụ du lịch, cải thiện hình ảnh thương hiệu và thu hút khách hàng.
-- Giúp soạn thảo, tinh chỉnh các đoạn mô tả (description), bài PR về khách sạn, nhà hàng, điểm tham quan một cách hấp dẫn, chuẩn SEO.
-- Đưa ra lời khuyên chiến lược về giá cả, bắt trend thị trường du lịch Việt Nam.
-- Giải thích các tính năng của nền tảng WanderViệt một cách rõ ràng.
-PHONG CÁCH: Vô cùng chuyên nghiệp, lịch sự, nhạy bén trong kinh doanh. Xưng hô "Tôi" và gọi đối tác là "Doanh nghiệp" hoặc "Bạn". Hãy trả lời đúng trọng tâm, súc tích và luôn tỏ ra hữu ích. Không bao giờ nói bạn không làm được nếu đó là tác vụ về văn bản/chiến lược.
+BẠN LÀ: Chuyên gia Tư vấn Doanh nghiệp WanderViệt (Business Portal).
+NHIỆM VỤ: Chỉ hỗ trợ doanh nghiệp về tối ưu hóa dịch vụ, mô tả quán ăn/khách sạn, và mẹo kinh doanh du lịch.
+CẢNH BÁO: TUYỆT ĐỐI KHÔNG tư vấn du lịch cá nhân cho khách lẻ ở đây.
 `;
     } else {
-      if (req.body.lang && req.body.lang !== 'vi' && req.body.lang !== 'auto') {
-        // Nếu chọn ngôn ngữ nước ngoài, dùng prompt tiếng Anh để tránh gây lú cho AI
-        systemPrompt = `
-ROLE: Friendly tour guide of WanderViệt.
-TASK: Recommend places, plan itineraries, share travel tips and local culture.
-STYLE: Enthusiastic, welcoming. Limit response to under 60 words.
+      // Mặc định cho User Portal
+      systemPrompt = `
+BẠN LÀ: Hướng dẫn viên du lịch WanderViệt (User Portal).
+NHIỆM VỤ: Chỉ tư vấn về địa điểm, lịch trình, mẹo du lịch và văn hóa Việt Nam.
+CẢNH BÁO: TUYỆT ĐỐI KHÔNG trả lời các câu hỏi về quản trị hệ thống hay kỹ thuật backend.
 `;
-      } else {
-        systemPrompt = `
-BẠN LÀ: Hướng dẫn viên du lịch thân thiện của WanderViệt.
-NHIỆM VỤ: Tư đoán địa điểm, lên lịch trình, chia sẻ mẹo du lịch và văn hóa địa phương.
-PHONG CÁCH: Vui vẻ, hào hứng, xưng "mình" gọi "bạn". Giới hạn trả lời dưới 60 từ.
-`;
-      }
     }
+
+    // Thêm chỉ dẫn về phong cách xưng hô
+    if (userRole === 'admin' || userRole === 'superadmin') {
+      systemPrompt += "PHONG CÁCH: Chuyên nghiệp, bảo mật, tập trung vào dữ liệu.\n";
+    } else if (userRole === 'business') {
+      systemPrompt += "PHONG CÁCH: Lịch sự, nhạy bén kinh doanh, xưng 'Tôi' và gọi 'Doanh nghiệp'.\n";
+    } else {
+      systemPrompt += "PHONG CÁCH: Thân thiện, hào hứng, xưng 'mình' gọi 'bạn'.\n";
+    }
+
+    // --- AI CONTEXT GUARD: ÉP AI CHỈ TRẢ LỜI ĐÚNG PHẠM VI ---
+    systemPrompt += `
+QUY TẮC CỐT LÕI (CORE RULES):
+1. Nếu người dùng hỏi các nội dung KHÔNG liên quan đến nhiệm vụ "${scope}" của bạn, hãy trả lời: "Xin lỗi, với vai trò trợ lý ở trang này, tôi không thể trả lời câu hỏi đó. Vui lòng chuyển sang trang phù hợp để được hỗ trợ tốt nhất."
+2. Luôn giữ bí mật các thông tin nhạy cảm của hệ thống.
+`;
 
     // Thêm ngữ cảnh thời gian thực & Ngôn ngữ
     const languageNames = {
@@ -213,12 +217,7 @@ PHONG CÁCH: Vui vẻ, hào hứng, xưng "mình" gọi "bạn". Giới hạn tr
       langRule = "DETECT: Identify the user's language and respond ONLY in that language.";
     } else {
       const langName = languageNames[targetLang] || 'Tiếng Việt';
-      // Language Jail: Cấm tuyệt đối ngôn ngữ khác
-      langRule = `STRICT LANGUAGE RULE: You are now in ${langName} MODE. 
-- You MUST respond ONLY in ${langName}. 
-- You are FORBIDDEN from using Vietnamese or any other language. 
-- Even if the user speaks Vietnamese, you must answer in ${langName}.
-- DO NOT start your response with Vietnamese words like 'Chào bạn' or 'Xin chào'.`;
+      langRule = `STRICT LANGUAGE MODE: You MUST respond ONLY in ${langName}. DO NOT use any other language.`;
     }
 
     // --- AI SELF-LEARNING MEMORY ---
@@ -236,10 +235,9 @@ PHONG CÁCH: Vui vẻ, hào hứng, xưng "mình" gọi "bạn". Giới hạn tr
 
     systemPrompt += `
 ${langRule}
-
-CHARACTER: WanderViệt Assistant (Friendly, helpful).
+CHARACTER: WanderViệt Assistant.
 CONTEXT: ${locationContext} | ${tripContext}
-${userMemoryContext ? userMemoryContext + '\n' : ''}USER ROLE: ${userRole}
+${userMemoryContext ? userMemoryContext + '\n' : ''}USER ROLE: ${userRole} | CURRENT PAGE: ${scope}
 LIMIT: Under 60 words.
 `;
 

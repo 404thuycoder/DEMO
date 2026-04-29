@@ -14,7 +14,27 @@
   <link rel="stylesheet" href="global-tokens.css?v=1776819067174" />
   <link rel="stylesheet" href="admin.css?v=202604240718" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="SharedUI.js?v=1776819067174"></script>
+  <script src="SharedUI.js?v=20260428"></script>
+  <script>
+    // ULTRA-SAFETY NET: Force hide splash screen after 5 seconds
+    // This runs independently of admin.js to prevent "stuck" UI
+    setTimeout(function() {
+      var wo = document.getElementById('welcome-overlay');
+      if (wo && (getComputedStyle(wo).display !== 'none')) {
+        console.warn("Splash screen emergency hide triggered.");
+        wo.style.opacity = '0';
+        wo.style.transition = 'opacity 0.6s ease';
+        setTimeout(function() { 
+          wo.style.display = 'none';
+          // Also ensure login is visible if not logged in
+          var lo = document.getElementById('admin-login-overlay');
+          if (lo && !localStorage.getItem('wander_admin_token')) {
+            lo.style.display = 'flex';
+          }
+        }, 600);
+      }
+    }, 5000);
+  </script>
     <style>
       .chart-container {
         width: 100%;
@@ -85,7 +105,10 @@
         <div class="admin-profile" id="admin-profile-head">
           <img src="" alt="Admin" class="admin-profile-img" id="admin-avatar-head" />
           <div class="admin-profile-info">
-            <span class="admin-profile-name" id="admin-name-head">Admin</span>
+            <div style="display:flex; align-items:center; gap:5px;">
+              <span id="admin-rank-head" class="admin-profile-rank"></span>
+              <span class="admin-profile-name" id="admin-name-head">Admin</span>
+            </div>
             <span class="admin-profile-role">Super Admin</span>
           </div>
         </div>
@@ -191,6 +214,10 @@
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><path d="M20 8v6"/><path d="M23 11h-6"/></svg>
               Quản trị viên
             </button>
+            <button type="button" class="sidebar-btn" data-admin-tab="support">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+              Hỗ trợ khách hàng
+            </button>
           </div>
 
           <!-- NHÓM: QUẢN LÝ NỘI DUNG -->
@@ -228,9 +255,22 @@
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.3 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10l-3.1 3.1a2 2 0 0 1-1.4.6H10.3z"/><path d="M15 8h.01"/><path d="M10 8h.01"/><path d="M7 8h.01"/><path d="M7 12h10"/><path d="M7 16h6"/></svg>
               Gửi thông báo
             </button>
+            <button type="button" class="sidebar-btn" data-admin-tab="ai-intelligence">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8z"/><path d="M12 6a6 6 0 1 0 6 6 6 6 0 0 0-6-6zm0 10a4 4 0 1 1 4-4 4 4 0 0 1-4 4z"/></svg>
+              Trí tuệ AI Hub
+            </button>
             <button type="button" class="sidebar-btn" data-admin-tab="logs">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
               Nhật ký hệ thống
+            </button>
+          </div>
+
+          <!-- NHÓM: CẤU HÌNH & BẢO MẬT -->
+          <div class="sidebar-group">
+            <h3 class="sidebar-group-title">Cấu hình & Bảo mật</h3>
+            <button type="button" class="sidebar-btn" data-admin-tab="system-config">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+              Cấu hình chung
             </button>
           </div>
           
@@ -663,8 +703,8 @@
                   <div class="metric-info">
                     <span class="metric-label">Người dùng mới</span>
                     <div class="metric-row">
-                      <span class="metric-value">+124</span>
-                      <span class="metric-trend up"><i class="fas fa-caret-up"></i> 12%</span>
+                      <span class="metric-value" id="an-stat-new-users">0</span>
+                      <span class="metric-trend" id="an-stat-new-users-trend" style="font-size:0.7rem">Khởi tạo...</span>
                     </div>
                   </div>
                 </div>
@@ -673,8 +713,8 @@
                   <div class="metric-info">
                     <span class="metric-label">Điểm đến mới</span>
                     <div class="metric-row">
-                      <span class="metric-value">42</span>
-                      <span class="metric-trend up"><i class="fas fa-caret-up"></i> 5%</span>
+                      <span class="metric-value" id="an-stat-new-places">0</span>
+                      <span class="metric-trend" id="an-stat-new-places-trend" style="font-size:0.7rem">Khởi tạo...</span>
                     </div>
                   </div>
                 </div>
@@ -683,8 +723,8 @@
                   <div class="metric-info">
                     <span class="metric-label">Đánh giá 5 sao</span>
                     <div class="metric-row">
-                      <span class="metric-value">85%</span>
-                      <span class="metric-trend up"><i class="fas fa-caret-up"></i> 3%</span>
+                      <span class="metric-value" id="an-stat-rating">0%</span>
+                      <span class="metric-trend" id="an-stat-rating-trend" style="font-size:0.7rem">Khởi tạo...</span>
                     </div>
                   </div>
                 </div>
@@ -1000,6 +1040,9 @@
                         <option value="/profile.html">Hồ sơ cá nhân</option>
                         <option value="/biz-dashboard.html">Dashboard Đối tác</option>
                         <option value="/biz-listing.html">Quản lý dịch vụ (Biz)</option>
+                      </select>
+                      <select id="quick-template-selector" class="command-input" style="width: auto; min-width: 170px; appearance: none; cursor: pointer; border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; padding: 2px 8px; background: rgba(255,255,255,0.03);">
+                        <option value="">-- Loading templates... --</option>
                       </select>
                     </div>
                   </div>
@@ -1358,6 +1401,153 @@
             </div>
           </section>
 
+          <!-- AI Intelligence Panel -->
+          <section id="panel-ai-intelligence" class="admin-panel glass-panel" hidden>
+            <div class="admin-panel-header">
+              <h2 class="section-title">🧠 Trí tuệ AI (Dành riêng cho Admin)</h2>
+              <p class="section-desc">Chatbot hỗ trợ nghiệp vụ quản trị, phân tích dữ liệu và tư vấn vận hành hệ thống.</p>
+            </div>
+            <div class="ai-hub-container" style="display:grid; grid-template-columns: 1fr 350px; gap:1.5rem; height:600px;">
+              <div class="ai-chat-box glass-panel" style="display:flex; flex-direction:column; background:rgba(0,0,0,0.3);">
+                <div id="ai-chat-messages" style="flex:1; overflow-y:auto; padding:1.5rem; display:flex; flex-direction:column; gap:1rem;">
+                  <div class="ai-msg ai-msg--bot">
+                    Chào bạn! Tôi là Trợ lý AI cấp cao của WanderViệt. Tôi chỉ trả lời các câu hỏi liên quan đến quản trị hệ thống, dữ liệu người dùng và tối ưu hóa vận hành. Tôi có thể giúp gì cho bạn?
+                  </div>
+                </div>
+                <div class="ai-chat-input-area" style="padding:1rem; border-top:1px solid rgba(255,255,255,0.05); display:flex; gap:0.75rem;">
+                  <input type="text" id="ai-hub-input" placeholder="Nhập câu hỏi nghiệp vụ quản trị..." style="flex:1; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); color:white; border-radius:8px; padding:0.75rem 1rem;" />
+                  <button class="btn btn--primary" id="btn-ai-hub-send">Gửi</button>
+                </div>
+              </div>
+              <div class="ai-knowledge-base glass-panel" style="padding:1.5rem;">
+                <h3 style="font-size:1rem; margin-top:0;">📚 Gợi ý nghiệp vụ</h3>
+                <ul style="list-style:none; padding:0; display:flex; flex-direction:column; gap:0.8rem; font-size:0.85rem; color:var(--admin-text-muted);">
+                  <li style="padding:0.75rem; background:rgba(255,255,255,0.03); border-radius:8px; cursor:pointer;" onclick="setAiHubQuery('Thống kê tăng trưởng người dùng tuần qua')">📊 Thống kê tăng trưởng người dùng tuần qua</li>
+                  <li style="padding:0.75rem; background:rgba(255,255,255,0.03); border-radius:8px; cursor:pointer;" onclick="setAiHubQuery('Phân tích các điểm đến đang HOT nhất')">📍 Phân tích các điểm đến đang HOT nhất</li>
+                  <li style="padding:0.75rem; background:rgba(255,255,255,0.03); border-radius:8px; cursor:pointer;" onclick="setAiHubQuery('Kiểm tra trạng thái server và DB')">🖥️ Kiểm tra trạng thái server và DB</li>
+                  <li style="padding:0.75rem; background:rgba(255,255,255,0.03); border-radius:8px; cursor:pointer;" onclick="setAiHubQuery('Dự báo lưu lượng truy cập tháng tới')">🔮 Dự báo lưu lượng truy cập tháng tới</li>
+                </ul>
+              </div>
+            </div>
+          </section>
+
+          <!-- Support Panel -->
+          <section id="panel-support" class="admin-panel glass-panel" hidden>
+            <div class="admin-panel-header">
+              <h2 class="section-title">💬 Hỗ trợ Khách hàng (Admin Cấp thấp)</h2>
+              <p class="section-desc">Hệ thống phản hồi trực tiếp và quản lý ticket hỗ trợ từ người dùng.</p>
+            </div>
+            <div class="support-layout" style="display:grid; grid-template-columns: 300px 1fr; gap:1.5rem; height:600px;">
+              <div class="support-sidebar glass-panel" style="overflow-y:auto; padding:1rem;">
+                <h3 style="font-size:0.9rem; margin-bottom:1rem;">Phiên chat gần đây</h3>
+                <div id="support-chat-list" style="display:flex; flex-direction:column; gap:0.5rem;">
+                  <div class="support-chat-item is-active" style="padding:0.75rem; background:rgba(99,102,241,0.1); border:1px solid rgba(99,102,241,0.2); border-radius:8px;">
+                    <div style="font-weight:600; font-size:0.85rem;">Nguyễn Văn A</div>
+                    <div style="font-size:0.75rem; color:var(--admin-text-muted);">Lỗi không đặt được lịch...</div>
+                  </div>
+                </div>
+              </div>
+              <div class="support-main glass-panel" style="display:flex; flex-direction:column; background:rgba(0,0,0,0.2);">
+                <div id="support-chat-messages" style="flex:1; overflow-y:auto; padding:1.5rem; display:flex; flex-direction:column; gap:1rem;">
+                   <div style="text-align:center; color:var(--admin-text-muted); font-size:0.8rem;">--- Bắt đầu phiên hỗ trợ ---</div>
+                </div>
+                <div class="support-input-area" style="padding:1rem; border-top:1px solid rgba(255,255,255,0.05); display:flex; gap:0.75rem;">
+                  <input type="text" id="support-input" placeholder="Trả lời khách hàng..." style="flex:1; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); color:white; border-radius:8px; padding:0.75rem 1rem;" />
+                  <button class="btn btn--primary" id="btn-support-send">Phản hồi</button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- System Config Panel -->
+          <section id="panel-system-config" class="admin-panel glass-panel" hidden>
+            <div class="admin-panel-header">
+              <h2 class="section-title">⚙️ Cấu hình Hệ thống</h2>
+              <p class="section-desc">Thiết lập các thông số vận hành cốt lõi của WanderViệt Super-app.</p>
+            </div>
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:2rem;">
+              <div class="config-group glass-panel" style="padding:1.5rem;">
+                <h3 style="font-size:1.1rem; margin-top:0;">Bảo trì & Trạng thái</h3>
+                <div style="display:flex; flex-direction:column; gap:1.25rem; margin-top:1.5rem;">
+                  <label style="display:flex; justify-content:space-between; align-items:center;">
+                    <span>Chế độ bảo trì toàn hệ thống</span>
+                    <input type="checkbox" class="admin-toggle" id="config-maintenance" />
+                  </label>
+                  <label style="display:flex; justify-content:space-between; align-items:center;">
+                    <span>Đóng đăng ký người dùng mới</span>
+                    <input type="checkbox" class="admin-toggle" id="config-disable-reg" />
+                  </label>
+                  <div class="field">
+                    <span class="field-label">Thông báo bảo trì</span>
+                    <textarea id="config-maintenance-msg" rows="2" placeholder="Hệ thống đang được nâng cấp..."></textarea>
+                  </div>
+                </div>
+              </div>
+              <div class="config-group glass-panel" style="padding:1.5rem;">
+                <h3 style="font-size:1.1rem; margin-top:0;">Trí tuệ Nhân tạo (AI)</h3>
+                <div style="display:flex; flex-direction:column; gap:1.25rem; margin-top:1.5rem;">
+                  <div class="field">
+                    <span class="field-label">AI Engine Model</span>
+                    <select id="config-ai-model">
+                      <option value="llama-3.1-8b">Llama 3.1 8B (Default)</option>
+                      <option value="llama-3.1-70b">Llama 3.1 70B (High Intel)</option>
+                      <option value="gpt-4o-mini">GPT-4o Mini (Speed)</option>
+                    </select>
+                  </div>
+                  <div class="field">
+                    <span class="field-label">Nhiệt độ (Creativity - Temperature)</span>
+                    <input type="range" min="0" max="1" step="0.1" id="config-ai-temp" />
+                  </div>
+                  <label style="display:flex; justify-content:space-between; align-items:center;">
+                    <span>Bật Context-Aware Chat</span>
+                    <input type="checkbox" checked class="admin-toggle" />
+                  </label>
+                </div>
+              </div>
+            </div>
+            <div style="margin-top:2rem; text-align:right;">
+              <button class="btn btn--primary" style="padding:0.75rem 2.5rem;" onclick="saveSystemConfig()">💾 Lưu tất cả thay đổi</button>
+            </div>
+          </section>
+
+          <!-- Phê duyệt Nội dung (Moderation) Panel -->
+          <section id="panel-moderation" class="admin-panel glass-panel" hidden>
+            <div class="panel-header-pro">
+              <div>
+                <h1 class="main-title">Duyệt Nội Dung</h1>
+                <p class="main-subtitle">Phê duyệt địa điểm mới và kiểm duyệt nội dung từ đối tác.</p>
+              </div>
+            </div>
+            
+            <div class="filter-bar" style="margin-bottom: 1.5rem;">
+              <button class="btn btn--small btn--primary">Đang chờ (12)</button>
+              <button class="btn btn--small btn--ghost">Đã duyệt</button>
+              <button class="btn btn--small btn--ghost">Đã từ chối</button>
+            </div>
+
+            <div class="table-wrap">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th>Đối tượng</th>
+                    <th>Người gửi</th>
+                    <th>Loại</th>
+                    <th>Trạng thái</th>
+                    <th style="text-align:right">Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody id="moderation-tbody">
+                  <tr>
+                    <td colspan="5" style="text-align:center; padding:3rem;">
+                      <div style="font-size:3rem; margin-bottom:1rem;">🔍</div>
+                      <p>Không có yêu cầu nào đang chờ duyệt.</p>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
           <!-- Lịch sử hoạt động Panel -->
           <section id="panel-logs" class="admin-panel glass-panel" hidden>
             <div style="display:flex; justify-content: space-between; align-items: flex-end; margin-bottom: 1rem;">
@@ -1674,7 +1864,7 @@
   </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js?v=202604231817" crossorigin=""></script>
-  <script src="admin.js?v=202604240718"></script>
+  <script src="admin.js?v=20260428"></script>
 </body>
 
 </html>

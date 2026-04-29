@@ -1,29 +1,27 @@
 const mongoose = require('mongoose');
 
 const notificationSchema = new mongoose.Schema({
-  recipientId: { 
-    type: String, 
-    required: true // Can be a specific User ID, or special keywords like 'ALL', 'ADMINS', 'BUSINESS'
-  },
-  senderId: { 
-    type: mongoose.Schema.Types.ObjectId, 
-    ref: 'User',
-    default: null // null if system-generated
-  },
+  recipientId: { type: String, required: true, index: true }, // ID người nhận (User/ID/ROLE/ALL)
+  recipientType: { type: String, default: 'user' },
+  
+  senderId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // ID người gây ra hành động
+  senderName: String,
+  
   type: { 
     type: String, 
-    enum: ['info', 'success', 'warning', 'error', 'broadcast'], 
-    default: 'info' 
+    enum: ['like', 'comment', 'booking', 'tour_request', 'system', 'message'], 
+    required: true 
   },
-  title: { type: String, required: true },
-  message: { type: String, required: true },
-  link: { type: String, default: '' },
+  
+  title: String,
+  message: String,
+  relatedId: mongoose.Schema.Types.ObjectId, // ID của bài viết/dịch vụ liên quan
+  link: String, // Đường dẫn để click vào xem ngay
+  
   isRead: { type: Boolean, default: false },
   createdAt: { type: Date, default: Date.now }
 });
 
-// Index to quickly find user notifications
-notificationSchema.index({ recipientId: 1, isRead: 1 });
 notificationSchema.index({ createdAt: -1 });
 
 module.exports = mongoose.model('Notification', notificationSchema);

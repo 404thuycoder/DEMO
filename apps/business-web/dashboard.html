@@ -29,6 +29,22 @@
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
+  <script>
+    // SAFETY NET: Force hide initial loader after 5 seconds if React fails to mount
+    setTimeout(() => {
+      const loader = document.querySelector('.initial-loader');
+      if (loader && loader.parentElement) {
+        console.warn('React mounting seems delayed. Forcing loader removal...');
+        // Only remove if it's still there (React might have already replaced #root)
+        if (document.body.contains(loader)) {
+          loader.style.opacity = '0';
+          loader.style.transition = 'opacity 0.5s ease';
+          setTimeout(() => loader.remove(), 500);
+        }
+      }
+    }, 5000);
+  </script>
+
   <script type="text/babel">
     const { useState, useEffect, useMemo, useCallback } = React;
 
@@ -59,18 +75,10 @@
         })
         .then(res => res.json())
         .then(data => {
-          // Fallback cho tài khoản demo cứng (phòng trường hợp DB chưa có)
-          if (!data.success && email === 'admin@company.com' && password === '123456') {
-            var user  = { id:'biz_001', name:'Admin Company', email:email, displayName:'Admin Company', tier:'VIP' };
-            var token = 'mock_biz_token_' + Date.now();
-            var store = rememberMe ? localStorage : sessionStorage;
-            store.setItem(AUTH_TOKEN_KEY, token);
-            store.setItem(AUTH_USER_KEY, JSON.stringify(user));
-            return { success:true, user:user, token:token };
-          }
           if (data.success) {
             var store = rememberMe ? localStorage : sessionStorage;
             store.setItem(AUTH_TOKEN_KEY, data.token);
+            store.setItem('wander_business_token', data.token); // Đồng bộ key
             store.setItem(AUTH_USER_KEY, JSON.stringify(data.user));
           }
           return data;
@@ -813,25 +821,36 @@
       const [checkingAuth, setCheckingAuth] = useState(true);
 
       useEffect(() => {
-        const storedUser = localStorage.getItem('currentUser');
-        if (storedUser) {
-          try {
-            setCurrentUser(JSON.parse(storedUser));
-          } catch(e) {}
-          setCheckingAuth(false);
+        // Nếu đã có token hợp lệ → redirect thẳng sang index.html
+        const token = localStorage.getItem('biz_auth_token') ||
+                      sessionStorage.getItem('biz_auth_token') ||
+                      localStorage.getItem('wander_business_token') ||
+                      sessionStorage.getItem('wander_business_token');
+
+        if (token) {
+          // Verify token với server trước khi redirect
+          fetch('/api/auth/business/me', { headers: { 'x-auth-token': token } })
+            .then(r => r.json())
+            .then(data => {
+              if (data.success) {
+                window.location.replace('index.html');
+              } else {
+                // Token không hợp lệ, xóa và hiện form login
+                ['biz_auth_token', 'wander_business_token'].forEach(k => {
+                  localStorage.removeItem(k);
+                  sessionStorage.removeItem(k);
+                });
+                localStorage.removeItem('currentUser');
+                setCheckingAuth(false);
+              }
+            })
+            .catch(() => setCheckingAuth(false));
           return;
         }
 
-        const session = mockAuthService.getSession();
-        if (session) {
-          const enhancedUser = { ...session.user, role: 'business' };
-          localStorage.setItem('currentUser', JSON.stringify(enhancedUser));
-          setCurrentUser(enhancedUser);
-          setCheckingAuth(false);
-        } else {
-          setCheckingAuth(false);
-        }
+        setCheckingAuth(false);
       }, []);
+
 
       // Real-time Heartbeat (Duy trì trạng thái trực tuyến)
       useEffect(() => {
@@ -847,13 +866,17 @@
       }, [currentUser]);
 
       const handleLoginSuccess = useCallback((user) => {
-        const enhancedUser = { ...user, role: 'business' };
-        localStorage.setItem('currentUser', JSON.stringify(enhancedUser));
-        setCurrentUser(enhancedUser);
+        // Redirect tới dashboard thật (index.html)
+        window.location.href = 'index.html';
       }, []);
 
       const handleLogout = useCallback(() => {
         mockAuthService.logout();
+        // Xóa tất cả token keys
+        ['biz_auth_token', 'wander_business_token'].forEach(k => {
+          localStorage.removeItem(k);
+          sessionStorage.removeItem(k);
+        });
         localStorage.removeItem('currentUser');
         setCurrentUser(null);
       }, []);
@@ -871,7 +894,9 @@
         return <AuthScreen onLoginSuccess={handleLoginSuccess} />;
       }
 
-      return <App currentUser={currentUser} onLogout={handleLogout} />;
+      // Nếu có currentUser nhưng chưa redirect (fallback) → redirect ngay
+      window.location.replace('index.html');
+      return null;
     }
 
     function App({ currentUser, onLogout }) {
@@ -887,6 +912,10 @@
       const [activeConv, setActiveConv] = useState(null);
       const [replyText, setReplyText] = useState('');
       const [fullScreenImage, setFullScreenImage] = useState(null);
+      const [leaderboardData, setLeaderboardData] = useState([]);
+      const [notifications, setNotifications] = useState([]);
+      const [showNotifDrawer, setShowNotifDrawer] = useState(false);
+      const [unreadNotifCount, setUnreadNotifCount] = useState(0);
 
       // ── Add-to-businesses form state ──
       const BIZ_EMPTY = { name:'', category:'', location:'', price:'', rating:'5', image:'' };
@@ -979,31 +1008,23 @@
         }
       };
 
-      const [leaderboardData, setLeaderboardData] = useState([]);
-
       useEffect(() => {
         const fetchData = async () => {
           const token = localStorage.getItem('biz_auth_token') || sessionStorage.getItem('biz_auth_token');
           if (!token) return;
           try {
-            // Load items (từ unified data store localStorage)
-            try {
-              const stored = localStorage.getItem('businesses');
-              if (stored) {
-                const parsed = JSON.parse(stored);
-                // Map lại một chút để Dashboard tương thích field names
-                const myBiz = parsed.filter(b => b.ownerId === currentUser.id);
-                const mapped = myBiz.map(b => ({
-                  ...b,
-                  kind: b.kind || (['Khách sạn', 'Ẩm thực', 'Thuê xe', 'Resort'].some(k => (b.category||'').includes(k)) ? 'tien-ich' : 'diem-du-lich'),
-                  region: b.location || b.region || 'Không rõ',
-                  priceFrom: b.price !== undefined ? b.price : (b.priceFrom || 0),
-                  status: b.status || 'approved'
-                }));
-                setItems(mapped);
-              }
-            } catch(err) {
-              console.error(err);
+            // Load items (từ Backend API)
+            const pRes = await fetch('/api/business/places', { headers: { 'x-auth-token': token } });
+            const pJson = await pRes.json();
+            if (pJson.success) {
+              const mapped = pJson.data.map(b => ({
+                ...b,
+                kind: b.kind || (['Khách sạn', 'Ẩm thực', 'Thuê xe', 'Resort'].some(k => (b.category||'').includes(k)) ? 'tien-ich' : 'diem-du-lich'),
+                region: b.region || 'Không rõ',
+                priceFrom: b.priceFrom || 0,
+                status: b.status || 'approved'
+              }));
+              setItems(mapped);
             }
 
             // Load conversations
@@ -1020,12 +1041,31 @@
             const lRes = await fetch('/api/business/leaderboard');
             const lJson = await lRes.json();
             if (lJson.success) setLeaderboardData(lJson.data);
+
+            // Load notifications
+            const nRes = await fetch('/api/notifications', { headers: { 'x-auth-token': token } });
+            const nJson = await nRes.json();
+            if (nJson.success) setNotifications(nJson.data);
+            
+            const uRes = await fetch('/api/notifications/unread-count', { headers: { 'x-auth-token': token } });
+            const uJson = await uRes.json();
+            if (uJson.success) setUnreadNotifCount(uJson.count);
           } catch (e) {
             console.error('Fetch error:', e);
           }
         };
+
         fetchData();
+        const interval = setInterval(fetchData, 30000);
+        return () => clearInterval(interval);
       }, [currentUser]);
+
+      const markNotifRead = async (id) => {
+        const token = localStorage.getItem('biz_auth_token') || sessionStorage.getItem('biz_auth_token');
+        await fetch(`/api/notifications/read/${id}`, { method: 'PUT', headers: { 'x-auth-token': token } });
+        setNotifications(prev => prev.map(n => n._id === id ? { ...n, isRead: true } : n));
+        setUnreadNotifCount(prev => Math.max(0, prev - 1));
+      };
 
       const filteredItems = useMemo(() => {
         const q = searchText.trim().toLowerCase();
@@ -1088,40 +1128,6 @@
           highlights: typeof formData.highlights === 'string' ? formData.highlights.split(',').map(s => s.trim()).filter(Boolean) : formData.highlights
         };
 
-        // ── Đồng bộ vào localStorage['businesses'] (unified data store) ──
-        try {
-          var stored = localStorage.getItem('businesses');
-          var list = stored ? JSON.parse(stored) : [];
-          var mappedObj = {
-            id: editingItem ? editingItem.id : Date.now(),
-            ownerId: editingItem ? editingItem.ownerId : currentUser.id,
-            name: formData.name || '',
-            category: formData.category || formData.kind || '',
-            location: formData.region || formData.address || '',
-            price: formData.priceFrom ? parseFloat(formData.priceFrom) : null,
-            rating: parseFloat(formData.rating) || 5,
-            image: formData.image || null,
-            views: editingItem ? (editingItem.views || 0) : 0,
-            bookings: editingItem ? (editingItem.bookings || 0) : 0,
-            description: formData.description || null
-          };
-
-          if (editingItem) {
-            var found = false;
-            list = list.map(b => {
-              if (String(b.id) === String(editingItem.id) || String(b._id) === String(editingItem.id) || (b.name === mappedObj.name && b.location === mappedObj.location)) {
-                found = true;
-                return { ...b, ...mappedObj };
-              }
-              return b;
-            });
-            if (!found) list.push(mappedObj);
-          } else {
-            list.push(mappedObj);
-          }
-          localStorage.setItem('businesses', JSON.stringify(list));
-        } catch(err) {}
-
         try {
           const res = await fetch(url, {
             method,
@@ -1140,16 +1146,6 @@
       };
       const handleDelete = async (id) => { 
         if (window.confirm('Bạn có chắc chắn muốn xóa mục này?')) {
-          // ── Xóa khỏi localStorage['businesses'] (unified data store) ──
-          try {
-            var stored = localStorage.getItem('businesses');
-            if (stored) {
-              var list = JSON.parse(stored);
-              list = list.filter(b => String(b.id) !== String(id) && String(b._id) !== String(id));
-              localStorage.setItem('businesses', JSON.stringify(list));
-            }
-          } catch(err) {}
-
           const token = localStorage.getItem('biz_auth_token') || sessionStorage.getItem('biz_auth_token');
           try {
             const res = await fetch(`/api/business/places/${id}`, { 
@@ -1228,7 +1224,13 @@
                 <span style={{fontSize:'1.2rem'}}>🏠</span> Trang chủ hệ sinh thái
               </div>
               <div className={`biz-nav-item ${activeTab==='manager' ? 'is-active' : ''}`} onClick={() => setActiveTab('manager')}>
-                <span style={{fontSize:'1.2rem'}}>📤</span> Quản lý tải lên
+                <span style={{fontSize:'1.2rem'}}>📤</span> Quản lý dịch vụ
+              </div>
+              <div className={`biz-nav-item ${activeTab==='bookings' ? 'is-active' : ''}`} onClick={() => setActiveTab('bookings')}>
+                <span style={{fontSize:'1.2rem'}}>📅</span> Đơn đặt chỗ (Mới)
+              </div>
+              <div className={`biz-nav-item ${activeTab==='broadcast' ? 'is-active' : ''}`} onClick={() => setActiveTab('broadcast')}>
+                <span style={{fontSize:'1.2rem'}}>📢</span> Gửi thông báo
               </div>
               <div className={`biz-nav-item ${activeTab==='messages' ? 'is-active' : ''}`} onClick={() => setActiveTab('messages')}>
                 <span style={{fontSize:'1.2rem'}}>💬</span> Hộp thư khách hàng
@@ -1266,9 +1268,115 @@
                   <input type="text" placeholder="Tìm điểm du lịch, tiện ích..." value={searchText} onChange={(e) => setSearchText(e.target.value)} style={{ background:'none', border:'none', color:'white', width:'100%' }} />
                 </div>
               </div>
+              
+              <div style={{ display:'flex', alignItems:'center', gap:'1rem' }}>
+                <div style={{ position:'relative' }}>
+                  <button onClick={() => setShowNotifDrawer(!showNotifDrawer)} style={{ background:'rgba(255,255,255,0.05)', border:'none', width:'42px', height:'42px', borderRadius:'12px', color:'white', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', transition:'all 0.2s' }} className="biz-card-hover">
+                    <span style={{ fontSize:'1.2rem' }}>🔔</span>
+                    {unreadNotifCount > 0 && (
+                      <span style={{ position:'absolute', top:'-5px', right:'-5px', background:'#f43f5e', color:'white', fontSize:'0.7rem', fontWeight:800, padding:'2px 6px', borderRadius:'8px', border:'2px solid #040914' }}>
+                        {unreadNotifCount > 9 ? '9+' : unreadNotifCount}
+                      </span>
+                    )}
+                  </button>
+                  
+                  {showNotifDrawer && (
+                    <div style={{ position:'absolute', top:'55px', right:0, width:'320px', background:'var(--biz-surface-light)', border:'1px solid var(--biz-border)', borderRadius:'16px', boxShadow:'0 20px 50px rgba(0,0,0,0.5)', zIndex:100, overflow:'hidden', animation:'authSlideIn 0.3s ease-out' }}>
+                      <div style={{ padding:'1rem', borderBottom:'1px solid var(--biz-border)', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                        <span style={{ fontWeight:700 }}>Thông báo</span>
+                        <span style={{ fontSize:'0.75rem', color:'var(--biz-accent)', cursor:'pointer' }}>Đánh dấu tất cả đã đọc</span>
+                      </div>
+                      <div style={{ maxHeight:'400px', overflowY:'auto' }}>
+                        {notifications.length === 0 ? (
+                          <div style={{ padding:'2rem', textAlign:'center', color:'var(--biz-text-muted)', fontSize:'0.85rem' }}>Không có thông báo nào</div>
+                        ) : (
+                          notifications.map(n => (
+                            <div key={n._id} onClick={() => markNotifRead(n._id)} style={{ padding:'1rem', borderBottom:'1px solid rgba(255,255,255,0.03)', cursor:'pointer', background: n.isRead ? 'transparent' : 'rgba(0,240,255,0.03)', transition:'background 0.2s' }} className="notif-item-hover">
+                              <div style={{ fontWeight: 600, fontSize:'0.88rem', marginBottom:'4px', color: n.isRead ? '#94a3b8' : 'white' }}>{n.title}</div>
+                              <div style={{ fontSize:'0.8rem', color:'#64748b', lineHeight:1.4 }}>{n.message}</div>
+                              <div style={{ fontSize:'0.7rem', color:'#475569', marginTop:'6px' }}>{new Date(n.createdAt).toLocaleString('vi-VN')}</div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
             </header>
 
             <main className="biz-content">
+              {activeTab === 'broadcast' && (
+                <div className="animate-fade">
+                   <div className="biz-card" style={{ padding:'2rem', maxWidth:'800px', margin:'0 auto' }}>
+                      <h2 style={{ marginBottom:'1.5rem' }}>📢 Gửi thông báo Broadcast</h2>
+                      <p style={{ color:'var(--biz-text-muted)', marginBottom:'2rem' }}>Gửi tin nhắn trực tiếp đến hàng nghìn người dùng đang quan tâm đến dịch vụ của bạn.</p>
+                      
+                      <div style={{ display:'flex', flexDirection:'column', gap:'1.5rem' }}>
+                         <div>
+                            <label style={{ display:'block', marginBottom:'0.5rem', fontWeight:600 }}>Tiêu đề thông báo</label>
+                            <input type="text" placeholder="Ví dụ: Ưu đãi 50% cho khách hàng cũ..." style={{ width:'100%', padding:'0.8rem', borderRadius:'10px', background:'var(--biz-surface-light)', border:'1px solid var(--biz-border)', color:'white' }} />
+                         </div>
+                         <div>
+                            <label style={{ display:'block', marginBottom:'0.5rem', fontWeight:600 }}>Nội dung chi tiết</label>
+                            <textarea placeholder="Nhập nội dung thông báo tại đây..." style={{ width:'100%', minHeight:'150px', padding:'0.8rem', borderRadius:'10px', background:'var(--biz-surface-light)', border:'1px solid var(--biz-border)', color:'white', resize:'none' }}></textarea>
+                         </div>
+                         <div style={{ display:'flex', gap:'1rem' }}>
+                            <button className="biz-btn-primary" style={{ padding:'0.8rem 2rem' }}>Gửi ngay bây giờ</button>
+                            <button style={{ background:'rgba(255,255,255,0.05)', border:'1px solid var(--biz-border)', padding:'0.8rem 2rem', borderRadius:'10px', color:'white', cursor:'pointer' }}>Lên lịch gửi</button>
+                         </div>
+                      </div>
+                   </div>
+                </div>
+              )}
+
+              {activeTab === 'bookings' && (
+                <div className="animate-fade">
+                   <div className="biz-card" style={{ padding:'1.5rem' }}>
+                      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'1.5rem' }}>
+                         <h2 style={{ margin:0 }}>📅 Quản lý đặt chỗ</h2>
+                         <div style={{ display:'flex', gap:'0.5rem' }}>
+                            <button className="biz-tag" style={{ background:'rgba(0,240,255,0.1)', color:'#00F0FF', border:'none', cursor:'pointer' }}>Tất cả</button>
+                            <button className="biz-tag" style={{ background:'transparent', color:'var(--biz-text-muted)', border:'none', cursor:'pointer' }}>Chờ xác nhận</button>
+                            <button className="biz-tag" style={{ background:'transparent', color:'var(--biz-text-muted)', border:'none', cursor:'pointer' }}>Thành công</button>
+                         </div>
+                      </div>
+
+                      <table className="biz-table" style={{ width:'100%', borderCollapse:'collapse' }}>
+                         <thead>
+                            <tr style={{ textAlign:'left', borderBottom:'1px solid var(--biz-border)' }}>
+                               <th style={{ padding:'1rem' }}>Khách hàng</th>
+                               <th style={{ padding:'1rem' }}>Dịch vụ</th>
+                               <th style={{ padding:'1rem' }}>Ngày sử dụng</th>
+                               <th style={{ padding:'1rem' }}>Trạng thái</th>
+                               <th style={{ padding:'1rem' }}>Thao tác</th>
+                            </tr>
+                         </thead>
+                         <tbody>
+                            {[1,2,3].map(i => (
+                               <tr key={i} style={{ borderBottom:'1px solid rgba(255,255,255,0.03)' }}>
+                                  <td style={{ padding:'1rem' }}>
+                                     <div style={{ display:'flex', alignItems:'center', gap:'0.75rem' }}>
+                                        <img src={`https://i.pravatar.cc/150?u=${i}`} style={{ width:'32px', height:'32px', borderRadius:'50%' }} />
+                                        <span>Khách hàng #{i}0${i}</span>
+                                     </div>
+                                  </td>
+                                  <td style={{ padding:'1rem' }}>Dịch vụ du lịch cao cấp</td>
+                                  <td style={{ padding:'1rem' }}>20/05/2024</td>
+                                  <td style={{ padding:'1rem' }}>
+                                     <span style={{ padding:'4px 10px', borderRadius:'6px', background:'rgba(251,191,36,0.1)', color:'#fbbf24', fontSize:'0.75rem' }}>Chờ xác nhận</span>
+                                  </td>
+                                  <td style={{ padding:'1rem' }}>
+                                     <button className="biz-tag" style={{ background:'var(--biz-accent)', color:'var(--biz-bg)', border:'none', cursor:'pointer', marginRight:'5px' }}>Duyệt</button>
+                                     <button className="biz-tag" style={{ background:'rgba(244,63,94,0.1)', color:'#f43f5e', border:'none', cursor:'pointer' }}>Từ chối</button>
+                                  </td>
+                               </tr>
+                            ))}
+                         </tbody>
+                      </table>
+                   </div>
+                </div>
+              )}
               {activeTab === 'ecosystem' && (
                 <div className="animate-fade">
                   {/* --- Ecosystem Hero (New Style) --- */}

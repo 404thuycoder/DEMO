@@ -8,7 +8,7 @@ const Place = require('../models/Place');
 const Feedback = require('../models/Feedback');
 const NodeCache = require('node-cache');
 const statsCache = new NodeCache({ stdTTL: 30, checkperiod: 60 });
-const { adminTokenAuth, JWT_SECRET } = require('./auth');
+const { adminTokenAuth, JWT_SECRET, generateCustomId } = require('./auth');
 const upload = require('../middlewares/upload');
 const SystemLog = require('../models/SystemLog');
 const logAction = require('../utils/logger');
@@ -262,12 +262,13 @@ router.get('/stats/distribution', adminTokenAuth, adminAuth, async (req, res) =>
     const cached = statsCache.get(cacheKey);
     if (cached) return res.json(cached);
 
-    const [userRes, bizRes, adminRes, userBizRes, userAdminRes] = await Promise.all([
+    const [userRes, bizRes, adminRes, userBizRes, userAdminRes, feedbacks] = await Promise.all([
       User.aggregate([ { $match: { role: 'user' } }, { $group: { _id: 'user', count: { $sum: 1 } } } ]),
       BusinessAccount.aggregate([ { $group: { _id: 'business', count: { $sum: 1 } } } ]),
       AdminAccount.aggregate([ { $group: { _id: 'admin', count: { $sum: 1 } } } ]),
       User.aggregate([ { $match: { role: 'business' } }, { $group: { _id: 'business', count: { $sum: 1 } } } ]),
-      User.aggregate([ { $match: { role: { $in: ['admin', 'superadmin'] } } }, { $group: { _id: 'admin', count: { $sum: 1 } } } ])
+      User.aggregate([ { $match: { role: { $in: ['admin', 'superadmin'] } } }, { $group: { _id: 'admin', count: { $sum: 1 } } } ]),
+      Feedback.aggregate([ { $group: { _id: "$rating", count: { $sum: 1 } } } ])
     ]);
 
     const roles = [
@@ -276,9 +277,22 @@ router.get('/stats/distribution', adminTokenAuth, adminAuth, async (req, res) =>
       { _id: 'admin', count: (adminRes[0]?.count || 0) + (userAdminRes[0]?.count || 0) }
     ];
 
+    // Mock devices for now but structured
+    const devices = [
+      { label: 'Mobile', count: roles[0].count > 0 ? Math.round(roles[0].count * 0.6) : 0 },
+      { label: 'Desktop', count: roles[0].count > 0 ? Math.round(roles[0].count * 0.35) : 0 },
+      { label: 'Tablet', count: roles[0].count > 0 ? Math.round(roles[0].count * 0.05) : 0 }
+    ];
+
+    // Map sentiments
+    const sentiments = [0, 0, 0, 0, 0]; // 1 to 5 stars
+    feedbacks.forEach(f => {
+      if (f._id >= 1 && f._id <= 5) sentiments[f._id - 1] = f.count;
+    });
+
     const newMembers = await User.countDocuments({ createdAt: { $gte: today }, role: 'user' });
 
-    const finalResult = { success: true, data: { roles, newMembers } };
+    const finalResult = { success: true, data: { roles, newMembers, devices, sentiments } };
     statsCache.set(cacheKey, finalResult, 60); // Cache 1 min
     res.json(finalResult);
   } catch (error) {
@@ -495,7 +509,14 @@ router.get('/stats/rankings', adminTokenAuth, adminAuth, async (req, res) => {
 // ─────────────────────────────────────────────
 router.get('/stats', adminTokenAuth, adminAuth, async (req, res) => {
   try {
-    const [userCount, bizAccountCount, userBizCount, adminAccountCount, userAdminCount, placeCount, feedbackCount, itineraryCount] = await Promise.all([
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+
+    const [
+      userCount, bizAccountCount, userBizCount, adminAccountCount, userAdminCount, 
+      placeCount, feedbackCount, itineraryCount,
+      newUsersToday, newPlacesToday, feedbacksToday
+    ] = await Promise.all([
       User.countDocuments({ role: 'user' }),
       BusinessAccount.countDocuments(),
       User.countDocuments({ role: 'business' }),
@@ -503,12 +524,28 @@ router.get('/stats', adminTokenAuth, adminAuth, async (req, res) => {
       User.countDocuments({ role: { $in: ['admin', 'superadmin'] } }),
       Place.countDocuments(),
       Feedback.countDocuments(),
-      Itinerary.countDocuments()
+      Itinerary.countDocuments(),
+      User.countDocuments({ role: 'user', createdAt: { $gte: startOfToday } }),
+      Place.countDocuments({ createdAt: { $gte: startOfToday } }),
+      Feedback.find({ createdAt: { $gte: startOfToday } }).select('rating').lean()
     ]);
 
     const totalBiz = bizAccountCount + userBizCount;
     const totalAdmin = adminAccountCount + userAdminCount;
     const totalUsers = userCount + totalBiz + totalAdmin;
+
+    // Calculate avg rating percentage for today
+    let avgRating = 0;
+    if (feedbacksToday.length > 0) {
+      const sum = feedbacksToday.reduce((acc, f) => acc + (f.rating || 0), 0);
+      avgRating = Math.round((sum / (feedbacksToday.length * 5)) * 100);
+    } else {
+      // Global average if no feedback today
+      const allFeedback = await Feedback.aggregate([{ $group: { _id: null, avg: { $avg: "$rating" } } }]);
+      if (allFeedback.length > 0) {
+        avgRating = Math.round((allFeedback[0].avg / 5) * 100);
+      }
+    }
 
     res.json({
       success: true,
@@ -520,6 +557,9 @@ router.get('/stats', adminTokenAuth, adminAuth, async (req, res) => {
         feedbackCount: feedbackCount,
         itineraryCount: itineraryCount,
         dailyInteractions: Math.floor((userCount * 2.5) + (itineraryCount * 5)),
+        newUsersToday,
+        newPlacesToday,
+        avgRating,
         rankHierarchy: [
           { label: '💎 Kim Cương', percent: 15 },
           { label: '🥇 Vàng', percent: 35 },
@@ -762,6 +802,52 @@ router.delete('/users/:id', adminTokenAuth, adminAuth, async (req, res) => {
   }
 });
 
+// Reset mật khẩu người dùng
+router.post('/users/:id/reset-password', adminTokenAuth, adminAuth, async (req, res) => {
+  try {
+    const executor = req.adminUser;
+    const { newPassword } = req.body;
+
+    if (!newPassword || newPassword.length < 6) {
+      return res.status(400).json({ success: false, message: 'Mật khẩu mới phải có ít nhất 6 ký tự.' });
+    }
+
+    let target = await User.findById(req.params.id);
+    let collection = 'User';
+
+    if (!target) {
+      target = await BusinessAccount.findById(req.params.id);
+      collection = 'BusinessAccount';
+    }
+    if (!target) {
+      target = await AdminAccount.findById(req.params.id);
+      collection = 'AdminAccount';
+    }
+
+    if (!target) return res.status(404).json({ success: false, message: 'Không tìm thấy người dùng' });
+
+    // Bảo vệ Super Admin
+    if (target.role === 'superadmin' && target._id.toString() !== executor.id) {
+      return res.status(403).json({ success: false, message: 'Không thể reset mật khẩu của Super Admin.' });
+    }
+
+    // Sub-Admin không thể reset mật khẩu Admin khác
+    if (executor.role !== 'superadmin' && (target.role === 'admin' || collection === 'AdminAccount')) {
+      return res.status(403).json({ success: false, message: 'Bạn không có quyền reset mật khẩu của Quản trị viên.' });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    target.password = await bcrypt.hash(newPassword, salt);
+    await target.save();
+
+    await logAction(executor.email || 'admin', executor.role || 'admin', 'USER_PASSWORD_CHANGED', { targetEmail: target.email, collection, resetByAdmin: true }, req.ip, req.headers['user-agent']);
+
+    res.json({ success: true, message: 'Đã reset mật khẩu thành công' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 // Cập nhật quyền nhanh (bật/tắt admin) — CHỈ Super Admin
 router.put('/users/:id/role', adminTokenAuth, superAdminAuth, async (req, res) => {
   try {
@@ -848,6 +934,8 @@ router.post('/places', adminTokenAuth, superAdminAuth, upload.array('imageFile',
     };
 
     const place = new Place({
+      id: generateCustomId(req.body.kind),
+      name: req.body.name,
       ...req.body,
       image: imagesArr[0] || '', // Fallback for backwards compatibility
       images: imagesArr,
@@ -1362,6 +1450,94 @@ router.get('/ai-intelligence', adminTokenAuth, adminAuth, async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 });
+
+const SystemConfig = require('../models/SystemConfig');
+const NotificationTemplate = require('../models/NotificationTemplate');
+
+// ─────────────────────────────────────────────
+//  API: QUẢN LÝ CẤU HÌNH HỆ THỐNG
+// ─────────────────────────────────────────────
+
+// Lấy cấu hình hiện tại
+router.get('/config', adminTokenAuth, adminAuth, async (req, res) => {
+  try {
+    let config = await SystemConfig.findOne();
+    if (!config) {
+      config = await SystemConfig.create({});
+    }
+    res.json({ success: true, data: config });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Lỗi tải cấu hình hệ thống' });
+  }
+});
+
+// Cập nhật cấu hình (Chỉ Super Admin)
+router.put('/config', adminTokenAuth, superAdminAuth, async (req, res) => {
+  try {
+    const updateData = req.body;
+    updateData.updatedAt = Date.now();
+    
+    let config = await SystemConfig.findOneAndUpdate({}, updateData, { new: true, upsert: true });
+    
+    await logAction(req.user.email, req.user.role, 'SYSTEM_CONFIG_UPDATED', updateData, req.ip, req.headers['user-agent']);
+    
+    res.json({ success: true, message: 'Đã cập nhật cấu hình hệ thống thành công', data: config });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Lỗi cập nhật cấu hình' });
+  }
+});
+
+// ─────────────────────────────────────────────
+//  API: THƯ VIỆN MẪU THÔNG BÁO
+// ─────────────────────────────────────────────
+
+// Lấy danh sách mẫu
+router.get('/notification-templates', adminTokenAuth, adminAuth, async (req, res) => {
+  try {
+    const templates = await NotificationTemplate.find().sort({ createdAt: -1 });
+    res.json({ success: true, data: templates });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Lỗi tải danh sách mẫu thông báo' });
+  }
+});
+
+// Thêm mẫu mới
+router.post('/notification-templates', adminTokenAuth, adminAuth, async (req, res) => {
+  try {
+    const { name, title, message, type, category } = req.body;
+    const template = new NotificationTemplate({ name, title, message, type, category });
+    await template.save();
+    res.json({ success: true, data: template });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Lỗi khi tạo mẫu thông báo' });
+  }
+});
+
+// Xóa mẫu
+router.delete('/notification-templates/:id', adminTokenAuth, adminAuth, async (req, res) => {
+  try {
+    await NotificationTemplate.findByIdAndDelete(req.params.id);
+    res.json({ success: true, message: 'Đã xóa mẫu thông báo' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Lỗi khi xóa mẫu' });
+  }
+});
+
+// ─────────────────────────────────────────────
+//  DATA SEEDING (Mẫu thông báo cơ bản)
+// ─────────────────────────────────────────────
+const seedTemplates = async () => {
+  const count = await NotificationTemplate.countDocuments();
+  if (count === 0) {
+    await NotificationTemplate.insertMany([
+      { name: 'BAO_TRI_HE_THONG', title: 'Thông báo Bảo trì', message: 'Hệ thống sẽ tiến hành bảo trì định kỳ vào lúc 02:00 sáng mai. Dự kiến kéo dài 2 tiếng.', type: 'warning', category: 'maintenance' },
+      { name: 'CHUC_MUNG_HANG_MOI', title: 'Chúc mừng thăng hạng!', message: 'Bạn đã đạt được cột mốc XP mới. Hãy kiểm tra các ưu đãi dành riêng cho hạng của bạn ngay!', type: 'success', category: 'account' },
+      { name: 'UU_DAI_CUOI_TUAN', title: 'Ưu đãi Cuối tuần cực HOT', message: 'Giảm ngay 20% cho các dịch vụ khách sạn tại Đà Nẵng và Phú Quốc. Đặt ngay kẻo lỡ!', type: 'info', category: 'promotion' }
+    ]);
+    console.log('--- ADMIN SEED: Default Notification Templates created ---');
+  }
+};
+seedTemplates();
 
 router.adminTokenAuth = adminTokenAuth;
 module.exports = router;
